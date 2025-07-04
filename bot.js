@@ -568,7 +568,13 @@ Motivo: ${reason}
                         name: tokenAsset.metadata?.name || 'Unknown',
                         symbol: tokenAsset.metadata?.symbol || 'UNK',
                         liquidity: liquidityUsd,
-                        volume24h: parseFloat(pool.stats?.volume_24h || 0),
+                        volume24h: parseFloat(
+                            pool.stats?.volume_24h || 
+                            pool.stats?.volume || 
+                            pool.volume?.['24h'] || 
+                            pool.volume || 
+                            0
+                        ),
                         dex: 'DeDust',
                         poolAddress: pool.address,
                         currentPrice: 0,
@@ -617,10 +623,15 @@ Motivo: ${reason}
         }
         
         // Filtri volume minimo (per evitare token morti)
-        const MIN_VOLUME = 1000; // $1,000 USD nelle 24h
+        const MIN_VOLUME = 100; // Riduciamo a $100 USD nelle 24h
         if (token.volume24h < MIN_VOLUME) {
-            console.log(`❌ Token ${token.symbol}: volume troppo basso (${token.volume24h})`);
-            return false;
+            // Se non c'è volume ma c'è buona liquidità, accetta comunque
+            if (token.liquidity > 10000) {
+                console.log(`⚠️ Token ${token.symbol}: volume basso (${token.volume24h}) ma liquidità alta (${token.liquidity}) - ACCETTATO`);
+            } else {
+                console.log(`❌ Token ${token.symbol}: volume troppo basso (${token.volume24h})`);
+                return false;
+            }
         }
         
         // Evita token con price change estremi (possibili pump & dump)
