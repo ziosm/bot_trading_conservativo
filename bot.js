@@ -223,13 +223,22 @@ class RealTradingBot {
             console.log('🔍 Scanning DEX per opportunità...');
             console.log('📊 Scan #' + this.scanCount);
             
-            const [dedustTokens, stonfiTokens, geckoTokens] = await Promise.all([
-                this.scanDeDust(),
-                this.scanSTONfi(),
-                this.scanGeckoTerminal()
-            ]);
+            // Temporaneamente, proviamo prima GeckoTerminal che ha dati più affidabili
+            const geckoTokens = await this.scanGeckoTerminal();
+            console.log(`🦎 GeckoTerminal tokens trovati: ${geckoTokens.length}`);
             
-            const allTokens = [...dedustTokens, ...stonfiTokens, ...geckoTokens];
+            // Se GeckoTerminal ha abbastanza token, usiamo solo quelli
+            if (geckoTokens.length > 10) {
+                const allTokens = geckoTokens;
+                console.log('📊 Usando solo GeckoTerminal per ora (dati più affidabili)');
+            } else {
+                // Altrimenti proviamo anche gli altri
+                const [dedustTokens, stonfiTokens] = await Promise.all([
+                    this.scanDeDust(),
+                    this.scanSTONfi()
+                ]);
+                const allTokens = [...dedustTokens, ...stonfiTokens, ...geckoTokens];
+            }
             
             console.log(`📋 Token totali trovati: ${allTokens.length}`);
             console.log(`   - DeDust: ${dedustTokens.length}`);
@@ -588,6 +597,19 @@ class RealTradingBot {
                 console.log('   id:', pools[0].id);
                 console.log('   type:', pools[0].type);
                 console.log('   attributes keys:', Object.keys(pools[0].attributes || {}));
+                
+                // Mostra esempio di pool TON
+                const tonPool = pools.find(p => 
+                    p.attributes?.base_token_symbol === 'TON' || 
+                    p.attributes?.quote_token_symbol === 'TON'
+                );
+                if (tonPool) {
+                    console.log('   TON pool example:');
+                    console.log('     name:', tonPool.attributes.name);
+                    console.log('     base:', tonPool.attributes.base_token_symbol);
+                    console.log('     quote:', tonPool.attributes.quote_token_symbol);
+                    console.log('     liquidity:', tonPool.attributes.reserve_in_usd);
+                }
             }
             
             // Filtra pool TON
@@ -607,18 +629,28 @@ class RealTradingBot {
                     const attrs = pool.attributes;
                     const isTONBase = attrs.base_token_symbol === 'TON';
                     
+                    // Estrai simbolo e nome del token (non-TON)
+                    const tokenSymbol = isTONBase ? 
+                        attrs.quote_token_symbol : 
+                        attrs.base_token_symbol;
+                    
+                    const tokenAddress = isTONBase ? 
+                        attrs.quote_token_address : 
+                        attrs.base_token_address;
+                    
                     // GeckoTerminal ha dati più affidabili
                     const liquidity = parseFloat(attrs.reserve_in_usd || attrs.liquidity_in_usd || 0);
                     const volume = parseFloat(attrs.volume_usd?.h24 || 0);
                     
+                    // Debug log per token con buona liquidità
+                    if (liquidity > 1000) {
+                        console.log(`🦎 GeckoTerminal: ${tokenSymbol} - Liq: ${liquidity.toFixed(0)}`);
+                    }
+                    
                     return {
-                        address: isTONBase ? 
-                            attrs.quote_token_address : 
-                            attrs.base_token_address,
+                        address: tokenAddress,
                         name: attrs.name || 'Unknown',
-                        symbol: isTONBase ? 
-                            attrs.quote_token_symbol : 
-                            attrs.base_token_symbol,
+                        symbol: tokenSymbol || 'UNKNOWN',
                         liquidity: liquidity,
                         volume24h: volume,
                         dex: pool.relationships?.dex?.data?.id || 'Unknown',
