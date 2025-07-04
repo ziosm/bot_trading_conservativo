@@ -103,7 +103,7 @@ class RealTradingBot {
         // Trading config
         this.realBalance = 0;
         this.keyPair = null;
-        this.autoTradingEnabled = false;
+        this.autoTradingEnabled = true; // ATTIVATO DI DEFAULT PER TEST!
         this.maxLossPerTrade = 0.01; // Max 0.01 TON per trade
         this.slippageTolerance = 0.05;
         this.maxPositions = 2; // Max 2 posizioni aperte
@@ -673,10 +673,11 @@ Motivo: ${reason}
 🚀 *Bot REAL TRADING Avviato*
 
 💰 Balance: ${this.realBalance.toFixed(4)} TON
-🤖 Trading: ${this.autoTradingEnabled ? '✅ ATTIVO' : '❌ DISATTIVATO'}
-⚠️ ATTENZIONE: Trading REALE!
+🤖 Trading: ✅ ATTIVO (DI DEFAULT)
+⚠️ ATTENZIONE: Trading REALE ATTIVO!
 
-Usa /auto per attivare il trading automatico
+Il bot inizierà a fare trade automaticamente!
+Usa /auto per disattivare se necessario
         `, 'startup');
         
         this.tradingLoop();
@@ -875,6 +876,12 @@ Usa /auto per attivare il trading automatico
 
     async toggleAutoTrading() {
         this.autoTradingEnabled = !this.autoTradingEnabled;
+        
+        // SALVA LO STATO IN UNA VARIABILE GLOBALE
+        global.AUTO_TRADING_ENABLED = this.autoTradingEnabled;
+        
+        console.log(`🤖 Auto Trading: ${this.autoTradingEnabled ? 'ATTIVATO' : 'DISATTIVATO'}`);
+        
         await this.sendMessage(
             this.autoTradingEnabled ? 
             '🤖 Auto Trading ATTIVATO ⚠️\n\nIl bot eseguirà trade REALI!' : 
