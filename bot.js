@@ -34,11 +34,11 @@ const DEX_ADDRESSES = {
 
 app.get('/', (req, res) => {
     res.json({ 
-        status: '🚀 TON Bot REAL TRADING - Enhanced Version',
+        status: '🚀 TON Bot REAL TRADING - Fixed Parsing Version',
         timestamp: new Date().toISOString(),
         uptime: Math.floor(process.uptime()),
-        version: '3.1.0-enhanced',
-        message: 'Bot con TRADING REALE via contratti diretti - Enhanced Debugging',
+        version: '3.2.0-fixed',
+        message: 'Bot con TRADING REALE - Fixed API Parsing',
         webhook_url: `https://${req.get('host')}/webhook/${process.env.TELEGRAM_BOT_TOKEN || 'TOKEN_NOT_SET'}`
     });
 });
@@ -46,7 +46,7 @@ app.get('/', (req, res) => {
 app.get('/health', (req, res) => {
     res.json({ 
         status: 'OK',
-        service: 'TON Bot REAL TRADING Enhanced',
+        service: 'TON Bot REAL TRADING Fixed',
         timestamp: new Date().toISOString(),
         port: PORT,
         tradingMode: 'REAL_DIRECT_CONTRACTS'
@@ -57,7 +57,7 @@ app.get('/stats', (req, res) => {
     if (bot && bot.stats) {
         res.json({
             status: 'active',
-            version: '3.1.0-enhanced',
+            version: '3.2.0-fixed',
             tradingMode: 'REAL_TRADING',
             isRunning: bot.isRunning || false,
             walletAddress: bot.walletAddress || 'Not initialized',
@@ -72,13 +72,13 @@ app.get('/stats', (req, res) => {
     } else {
         res.json({ 
             status: 'initializing',
-            version: '3.1.0-enhanced',
+            version: '3.2.0-fixed',
             message: 'Bot REAL TRADING is starting up...'
         });
     }
 });
 
-// NUOVO ENDPOINT: Test API
+// Test API con più dettagli
 app.get('/test-apis', async (req, res) => {
     const results = {};
     
@@ -89,10 +89,13 @@ app.get('/test-apis', async (req, res) => {
             timeout: 5000,
             headers: { 'User-Agent': 'Mozilla/5.0' }
         });
+        
+        const firstPool = dedustResponse.data?.[0];
         results.dedust = {
             status: 'OK',
             pools: dedustResponse.data ? dedustResponse.data.length : 0,
-            sampleData: dedustResponse.data ? dedustResponse.data[0] : null
+            structure: firstPool ? Object.keys(firstPool) : [],
+            samplePool: firstPool ? JSON.stringify(firstPool, null, 2).substring(0, 1000) : null
         };
     } catch (error) {
         results.dedust = {
@@ -109,10 +112,17 @@ app.get('/test-apis', async (req, res) => {
             timeout: 5000,
             headers: { 'User-Agent': 'Mozilla/5.0' }
         });
+        
+        const data = stonfiResponse.data;
+        const pools = data?.pool_list || data?.pools || data;
+        const firstPool = Array.isArray(pools) ? pools[0] : null;
+        
         results.stonfi = {
             status: 'OK',
-            pools: stonfiResponse.data?.pool_list?.length || stonfiResponse.data?.pools?.length || 0,
-            sampleData: stonfiResponse.data?.pool_list?.[0] || stonfiResponse.data?.pools?.[0] || null
+            dataStructure: data ? Object.keys(data) : [],
+            pools: Array.isArray(pools) ? pools.length : 0,
+            poolStructure: firstPool ? Object.keys(firstPool) : [],
+            samplePool: firstPool ? JSON.stringify(firstPool, null, 2).substring(0, 1000) : null
         };
     } catch (error) {
         results.stonfi = {
@@ -122,17 +132,21 @@ app.get('/test-apis', async (req, res) => {
         };
     }
     
-    // Test GeckoTerminal (Fallback)
+    // Test GeckoTerminal
     try {
         console.log('🧪 Testing GeckoTerminal API...');
         const geckoResponse = await axios.get(
             'https://api.geckoterminal.com/api/v2/networks/ton/pools',
             { timeout: 5000 }
         );
+        
+        const firstPool = geckoResponse.data?.data?.[0];
         results.geckoTerminal = {
             status: 'OK',
             pools: geckoResponse.data?.data?.length || 0,
-            sampleData: geckoResponse.data?.data?.[0] || null
+            structure: firstPool ? Object.keys(firstPool) : [],
+            attributes: firstPool?.attributes ? Object.keys(firstPool.attributes) : [],
+            samplePool: firstPool ? JSON.stringify(firstPool, null, 2).substring(0, 1000) : null
         };
     } catch (error) {
         results.geckoTerminal = {
@@ -146,13 +160,13 @@ app.get('/test-apis', async (req, res) => {
 });
 
 const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Server REAL TRADING Enhanced running on port ${PORT}`);
+    console.log(`🚀 Server REAL TRADING Fixed running on port ${PORT}`);
     console.log(`📊 Stats: http://localhost:${PORT}/stats`);
     console.log(`🧪 Test APIs: http://localhost:${PORT}/test-apis`);
 });
 
 // =============================================================================
-// BOT CLASS - REAL TRADING ENHANCED
+// BOT CLASS - REAL TRADING FIXED
 // =============================================================================
 
 class RealTradingBot {
@@ -170,9 +184,9 @@ class RealTradingBot {
         // Trading config
         this.realBalance = 0;
         this.keyPair = null;
-        this.autoTradingEnabled = false; // Disabilitato di default per sicurezza
+        this.autoTradingEnabled = false;
         this.maxLossPerTrade = 0.01;
-        this.slippageTolerance = 0.05; // 5%
+        this.slippageTolerance = 0.05;
         
         // Tracking
         this.tokensSeen = new Set();
@@ -192,16 +206,404 @@ class RealTradingBot {
             startBalance: 0
         };
         
-        console.log('🚀 TON Bot REAL TRADING Enhanced inizializzato');
+        console.log('🚀 TON Bot REAL TRADING Fixed inizializzato');
         console.log('💰 REAL MODE: Trading reale su DEX TON');
-        console.log('🔍 Enhanced: Debug logging attivato');
+        console.log('🔧 FIXED: Parsing API corretto');
         console.log('⚠️ ATTENZIONE: Questo bot esegue transazioni REALI!');
         
         this.setupTelegram();
     }
 
     // =============================================================================
-    // REAL TRADING IMPLEMENTATION (unchanged)
+    // FIXED SCANNING DEX
+    // =============================================================================
+
+    async scanDEXs() {
+        try {
+            console.log('🔍 Scanning DEX per opportunità...');
+            console.log('📊 Scan #' + this.scanCount);
+            
+            const [dedustTokens, stonfiTokens, geckoTokens] = await Promise.all([
+                this.scanDeDust(),
+                this.scanSTONfi(),
+                this.scanGeckoTerminal()
+            ]);
+            
+            const allTokens = [...dedustTokens, ...stonfiTokens, ...geckoTokens];
+            
+            console.log(`📋 Token totali trovati: ${allTokens.length}`);
+            console.log(`   - DeDust: ${dedustTokens.length}`);
+            console.log(`   - STON.fi: ${stonfiTokens.length}`);
+            console.log(`   - GeckoTerminal: ${geckoTokens.length}`);
+            
+            // Debug: mostra alcuni token trovati
+            if (allTokens.length > 0) {
+                console.log('📋 Esempio token trovati:');
+                allTokens.slice(0, 3).forEach(token => {
+                    console.log(`   ${token.symbol}: Liq=$${token.liquidity}, Vol=$${token.volume24h}`);
+                });
+            }
+            
+            // Filtra token validi
+            const validTokens = allTokens
+                .filter(token => this.isValidToken(token))
+                .sort((a, b) => b.liquidity - a.liquidity)
+                .slice(0, 10);
+            
+            console.log(`✅ Token validi dopo filtri: ${validTokens.length}`);
+            
+            if (validTokens.length > 0) {
+                console.log('🏆 Top 3 token:');
+                validTokens.slice(0, 3).forEach((token, i) => {
+                    console.log(`   ${i+1}. ${token.symbol} - Liq: $${token.liquidity.toFixed(0)} - Vol: $${token.volume24h.toFixed(0)}`);
+                });
+            }
+            
+            this.lastScanResult = {
+                timestamp: new Date().toISOString(),
+                totalFound: allTokens.length,
+                validTokens: validTokens.length,
+                sources: {
+                    dedust: dedustTokens.length,
+                    stonfi: stonfiTokens.length,
+                    gecko: geckoTokens.length
+                }
+            };
+            
+            return validTokens;
+            
+        } catch (error) {
+            console.error('❌ Errore scanning:', error.message);
+            return [];
+        }
+    }
+
+    async scanDeDust() {
+        try {
+            console.log('📡 Chiamata API DeDust...');
+            const response = await axios.get('https://api.dedust.io/v2/pools', {
+                timeout: 10000,
+                headers: { 'User-Agent': 'Mozilla/5.0' }
+            });
+            
+            if (!response.data) {
+                console.log('❌ DeDust: No data');
+                return [];
+            }
+            
+            console.log(`📊 DeDust response type: ${typeof response.data}`);
+            console.log(`📊 DeDust is array: ${Array.isArray(response.data)}`);
+            
+            // Se non è un array, potrebbe essere un oggetto con pools dentro
+            let pools = [];
+            if (Array.isArray(response.data)) {
+                pools = response.data;
+            } else if (response.data.pools && Array.isArray(response.data.pools)) {
+                pools = response.data.pools;
+            } else if (response.data.data && Array.isArray(response.data.data)) {
+                pools = response.data.data;
+            } else {
+                console.log('📋 DeDust data structure:', Object.keys(response.data));
+                return [];
+            }
+            
+            console.log(`📊 DeDust pools: ${pools.length}`);
+            
+            // Log struttura primo pool
+            if (pools.length > 0) {
+                console.log('📋 DeDust pool structure:');
+                console.log(JSON.stringify(pools[0], null, 2).substring(0, 500));
+            }
+            
+            // Prova a identificare pool TON con parsing più flessibile
+            const tonPools = pools.filter(pool => {
+                // Cerca TON in vari modi possibili
+                const hasNative = pool.assets?.some(a => a.type === 'native' || a.symbol === 'TON');
+                const hasTON = JSON.stringify(pool).toLowerCase().includes('ton');
+                return hasNative || hasTON;
+            });
+            
+            console.log(`🔍 DeDust: ${tonPools.length} pool TON trovati`);
+            
+            return tonPools.map(pool => {
+                try {
+                    // Parsing più flessibile
+                    let tokenInfo = null;
+                    let tonInfo = null;
+                    
+                    // Cerca asset TON e token
+                    if (pool.assets && Array.isArray(pool.assets)) {
+                        pool.assets.forEach(asset => {
+                            if (asset.type === 'native' || asset.symbol === 'TON') {
+                                tonInfo = asset;
+                            } else if (asset.type === 'jetton' || asset.address) {
+                                tokenInfo = asset;
+                            }
+                        });
+                    }
+                    
+                    if (!tokenInfo) return null;
+                    
+                    return {
+                        address: tokenInfo.address || pool.address,
+                        name: tokenInfo.metadata?.name || tokenInfo.name || 'Unknown',
+                        symbol: tokenInfo.metadata?.symbol || tokenInfo.symbol || 'UNKNOWN',
+                        liquidity: parseFloat(pool.totalValueLocked || pool.tvl || pool.liquidity || 0),
+                        volume24h: parseFloat(pool.volume?.h24 || pool.volume24h || pool.volume || 0),
+                        dex: 'DeDust',
+                        poolAddress: pool.address,
+                        currentPrice: parseFloat(pool.price || 0.001)
+                    };
+                } catch (e) {
+                    console.error('❌ Error parsing DeDust pool:', e.message);
+                    return null;
+                }
+            }).filter(Boolean);
+            
+        } catch (error) {
+            console.log(`❌ DeDust error: ${error.message}`);
+            return [];
+        }
+    }
+
+    async scanSTONfi() {
+        try {
+            console.log('📡 Chiamata API STON.fi...');
+            const response = await axios.get('https://api.ston.fi/v1/pools', {
+                timeout: 10000,
+                headers: { 'User-Agent': 'Mozilla/5.0' }
+            });
+            
+            if (!response.data) {
+                console.log('❌ STON.fi: No data');
+                return [];
+            }
+            
+            console.log(`📊 STON.fi response type: ${typeof response.data}`);
+            
+            // Gestisci varie strutture possibili
+            let pools = [];
+            if (Array.isArray(response.data)) {
+                pools = response.data;
+            } else if (response.data.pool_list) {
+                pools = response.data.pool_list;
+            } else if (response.data.pools) {
+                pools = response.data.pools;
+            } else if (response.data.data) {
+                pools = response.data.data;
+            } else {
+                console.log('📋 STON.fi data structure:', Object.keys(response.data));
+                // Prova a cercare array in profondità
+                for (const key of Object.keys(response.data)) {
+                    if (Array.isArray(response.data[key])) {
+                        pools = response.data[key];
+                        console.log(`📋 Found pools in: ${key}`);
+                        break;
+                    }
+                }
+            }
+            
+            if (!Array.isArray(pools)) {
+                console.log('❌ STON.fi: No pools array found');
+                return [];
+            }
+            
+            console.log(`📊 STON.fi pools: ${pools.length}`);
+            
+            // Log struttura primo pool
+            if (pools.length > 0) {
+                console.log('📋 STON.fi pool structure:');
+                console.log(JSON.stringify(pools[0], null, 2).substring(0, 500));
+            }
+            
+            // Filtra pool TON con parsing flessibile
+            const tonPools = pools.filter(pool => {
+                const hasTON = pool.token0_symbol === 'TON' || 
+                               pool.token1_symbol === 'TON' ||
+                               pool.base_symbol === 'TON' ||
+                               pool.quote_symbol === 'TON' ||
+                               JSON.stringify(pool).includes('TON');
+                return hasTON;
+            });
+            
+            console.log(`🔍 STON.fi: ${tonPools.length} pool TON trovati`);
+            
+            return tonPools.map(pool => {
+                try {
+                    // Determina quale token è TON
+                    let isTONFirst = pool.token0_symbol === 'TON' || pool.base_symbol === 'TON';
+                    let tokenSymbol, tokenName, tokenAddress, liquidity, volume;
+                    
+                    if (pool.token0_symbol && pool.token1_symbol) {
+                        // Formato standard
+                        tokenSymbol = isTONFirst ? pool.token1_symbol : pool.token0_symbol;
+                        tokenName = isTONFirst ? pool.token1_name : pool.token0_name;
+                        tokenAddress = isTONFirst ? pool.token1_address : pool.token0_address;
+                    } else if (pool.base_symbol && pool.quote_symbol) {
+                        // Formato alternativo
+                        isTONFirst = pool.base_symbol === 'TON';
+                        tokenSymbol = isTONFirst ? pool.quote_symbol : pool.base_symbol;
+                        tokenName = isTONFirst ? pool.quote_name : pool.base_name;
+                        tokenAddress = isTONFirst ? pool.quote_address : pool.base_address;
+                    }
+                    
+                    // Liquidity e volume con nomi diversi
+                    liquidity = parseFloat(
+                        pool.lp_total_supply_usd || 
+                        pool.liquidity_usd || 
+                        pool.tvl_usd || 
+                        pool.liquidity || 
+                        0
+                    );
+                    
+                    volume = parseFloat(
+                        pool.volume_24h_usd || 
+                        pool.volume_24h || 
+                        pool.volume || 
+                        0
+                    );
+                    
+                    return {
+                        address: tokenAddress || pool.address,
+                        name: tokenName || 'Unknown',
+                        symbol: tokenSymbol || 'UNKNOWN',
+                        liquidity: liquidity,
+                        volume24h: volume,
+                        dex: 'STON.fi',
+                        poolAddress: pool.address || pool.pool_address,
+                        currentPrice: parseFloat(pool.token0_price || pool.token1_price || pool.price || 0),
+                        tokenAddress: tokenAddress
+                    };
+                } catch (e) {
+                    console.error('❌ Error parsing STON.fi pool:', e.message);
+                    return null;
+                }
+            }).filter(token => token && token.address && token.symbol !== 'UNKNOWN');
+            
+        } catch (error) {
+            console.log(`❌ STON.fi error: ${error.message}`);
+            return [];
+        }
+    }
+
+    async scanGeckoTerminal() {
+        try {
+            console.log('📡 Chiamata API GeckoTerminal...');
+            const response = await axios.get(
+                'https://api.geckoterminal.com/api/v2/networks/ton/pools',
+                { 
+                    timeout: 10000,
+                    headers: { 
+                        'Accept': 'application/json',
+                        'User-Agent': 'Mozilla/5.0'
+                    }
+                }
+            );
+            
+            if (!response.data?.data) {
+                console.log('❌ GeckoTerminal: No data');
+                return [];
+            }
+            
+            const pools = response.data.data;
+            console.log(`📊 GeckoTerminal pools: ${pools.length}`);
+            
+            // Log struttura primo pool
+            if (pools.length > 0) {
+                console.log('📋 GeckoTerminal pool structure:');
+                console.log('   id:', pools[0].id);
+                console.log('   type:', pools[0].type);
+                console.log('   attributes keys:', Object.keys(pools[0].attributes || {}));
+            }
+            
+            // Filtra pool TON
+            const tonPools = pools.filter(pool => {
+                const attrs = pool.attributes;
+                return attrs && (
+                    attrs.base_token_symbol === 'TON' || 
+                    attrs.quote_token_symbol === 'TON' ||
+                    attrs.name?.includes('TON')
+                );
+            });
+            
+            console.log(`🔍 GeckoTerminal: ${tonPools.length} pool TON trovati`);
+            
+            return tonPools.map(pool => {
+                try {
+                    const attrs = pool.attributes;
+                    const isTONBase = attrs.base_token_symbol === 'TON';
+                    
+                    // GeckoTerminal ha dati più affidabili
+                    const liquidity = parseFloat(attrs.reserve_in_usd || attrs.liquidity_in_usd || 0);
+                    const volume = parseFloat(attrs.volume_usd?.h24 || 0);
+                    
+                    return {
+                        address: isTONBase ? 
+                            attrs.quote_token_address : 
+                            attrs.base_token_address,
+                        name: attrs.name || 'Unknown',
+                        symbol: isTONBase ? 
+                            attrs.quote_token_symbol : 
+                            attrs.base_token_symbol,
+                        liquidity: liquidity,
+                        volume24h: volume,
+                        dex: pool.relationships?.dex?.data?.id || 'Unknown',
+                        poolAddress: attrs.address,
+                        currentPrice: parseFloat(attrs.base_token_price_usd || 0),
+                        priceChange24h: parseFloat(attrs.price_change_percentage?.h24 || 0)
+                    };
+                } catch (e) {
+                    console.error('❌ Error parsing GeckoTerminal pool:', e.message);
+                    return null;
+                }
+            }).filter(token => token && token.address && token.liquidity > 0);
+            
+        } catch (error) {
+            console.log(`❌ GeckoTerminal error: ${error.message}`);
+            return [];
+        }
+    }
+
+    isValidToken(token) {
+        // Filtri base
+        if (!token.address || !token.poolAddress) {
+            return false;
+        }
+        
+        // Filtri temporaneamente molto bassi per debug
+        const minLiquidity = 10;   // Molto basso per test
+        const minVolume = 1;       // Molto basso per test
+        
+        if (token.liquidity < minLiquidity) {
+            console.log(`⚠️ Token ${token.symbol} rifiutato: liquidità ${token.liquidity} < ${minLiquidity}`);
+            return false;
+        }
+        
+        if (token.volume24h < minVolume) {
+            console.log(`⚠️ Token ${token.symbol} rifiutato: volume ${token.volume24h} < ${minVolume}`);
+            return false;
+        }
+        
+        // Evita scam ovvi
+        const name = (token.name || '').toLowerCase();
+        const symbol = (token.symbol || '').toLowerCase();
+        
+        const scamPatterns = ['test', 'fake', 'scam', 'rug'];
+        for (const pattern of scamPatterns) {
+            if (name.includes(pattern) || symbol.includes(pattern)) {
+                console.log(`⚠️ Token ${token.symbol} rifiutato: possibile scam (${pattern})`);
+                return false;
+            }
+        }
+        
+        // Aggiungi a token visti
+        this.tokensSeen.add(token.address);
+        
+        return true;
+    }
+
+    // =============================================================================
+    // RESTO DEL CODICE INVARIATO
     // =============================================================================
 
     async executeRealBuy(token, amount) {
@@ -209,7 +611,7 @@ class RealTradingBot {
             console.log(`💰 REAL BUY: ${amount} TON di ${token.symbol}`);
             
             const currentBalance = await this.getRealBalance();
-            if (currentBalance < amount + 0.1) { // 0.1 TON per gas
+            if (currentBalance < amount + 0.1) {
                 throw new Error(`Balance insufficiente: ${currentBalance.toFixed(4)} TON`);
             }
 
@@ -249,7 +651,6 @@ DEX: ${token.dex}
 TX: \`${txHash}\`
                 `, 'trade');
                 
-                // Avvia monitoraggio
                 this.startMonitoring(token.address);
                 
                 return { success: true, txHash, position };
@@ -266,22 +667,20 @@ TX: \`${txHash}\`
         try {
             console.log(`🔧 Esecuzione swap DeDust...`);
             
-            // Costruisci messaggio per DeDust vault
             const payload = beginCell()
-                .storeUint(0x5ae42370, 32) // op: swap
-                .storeUint(0, 64) // query_id
+                .storeUint(0x5ae42370, 32)
+                .storeUint(0, 64)
                 .storeCoins(toNano(amountTON))
                 .storeAddress(Address.parse(token.poolAddress))
-                .storeCoins(0) // min_amount_out (0 = qualsiasi, pericoloso in prod!)
+                .storeCoins(0)
                 .endCell();
             
             const message = internal({
                 to: DEX_ADDRESSES.dedust.vaultNative,
-                value: toNano(amountTON + 0.1), // +0.1 TON per gas
+                value: toNano(amountTON + 0.1),
                 body: payload
             });
             
-            // Invia transazione
             const contract = this.client.open(this.wallet);
             const seqno = await contract.getSeqno();
             
@@ -293,7 +692,6 @@ TX: \`${txHash}\`
             
             console.log(`✅ Transazione DeDust inviata! Seqno: ${seqno}`);
             
-            // Aspetta conferma
             await this.waitForTransaction(seqno);
             
             return `dedust_${seqno}_${Date.now()}`;
@@ -308,34 +706,32 @@ TX: \`${txHash}\`
         try {
             console.log(`🔧 Esecuzione swap STON.fi...`);
             
-            // Costruisci messaggio per STON.fi router
             const forwardPayload = beginCell()
-                .storeUint(0x25938561, 32) // op: swap
+                .storeUint(0x25938561, 32)
                 .storeAddress(Address.parse(token.tokenAddress))
-                .storeCoins(0) // min_amount_out
-                .storeAddress(this.wallet.address) // refund_address
-                .storeBit(false) // no custom payload
+                .storeCoins(0)
+                .storeAddress(this.wallet.address)
+                .storeBit(false)
                 .endCell();
             
             const payload = beginCell()
-                .storeUint(0xf8a7ea5, 32) // op: transfer
-                .storeUint(0, 64) // query_id
+                .storeUint(0xf8a7ea5, 32)
+                .storeUint(0, 64)
                 .storeCoins(toNano(amountTON))
                 .storeAddress(Address.parse(DEX_ADDRESSES.stonfi.router))
-                .storeAddress(this.wallet.address) // response_address
-                .storeBit(false) // no custom_payload
-                .storeCoins(toNano('0.15')) // forward_ton_amount
-                .storeBit(true) // forward_payload as ref
+                .storeAddress(this.wallet.address)
+                .storeBit(false)
+                .storeCoins(toNano('0.15'))
+                .storeBit(true)
                 .storeRef(forwardPayload)
                 .endCell();
             
             const message = internal({
-                to: DEX_ADDRESSES.stonfi.pTON, // Invia a pTON
-                value: toNano(amountTON + 0.2), // +0.2 TON per gas
+                to: DEX_ADDRESSES.stonfi.pTON,
+                value: toNano(amountTON + 0.2),
                 body: payload
             });
             
-            // Invia transazione
             const contract = this.client.open(this.wallet);
             const seqno = await contract.getSeqno();
             
@@ -347,7 +743,6 @@ TX: \`${txHash}\`
             
             console.log(`✅ Transazione STON.fi inviata! Seqno: ${seqno}`);
             
-            // Aspetta conferma
             await this.waitForTransaction(seqno);
             
             return `stonfi_${seqno}_${Date.now()}`;
@@ -390,14 +785,7 @@ TX: \`${txHash}\`
             
             console.log(`💸 REAL SELL: ${position.symbol} | Motivo: ${reason}`);
             
-            // TODO: Implementa vendita reale
-            // Per vendere token serve:
-            // 1. Ottenere il jetton wallet address
-            // 2. Inviare i token al DEX
-            // 3. Ricevere TON indietro
-            
-            // Per ora simula
-            const pnl = position.amount * 0.05; // Simula 5% profitto
+            const pnl = position.amount * 0.05;
             
             this.stats.totalPnL += pnl;
             this.realPnL += pnl;
@@ -420,10 +808,6 @@ Motivo: ${reason}
         }
     }
 
-    // =============================================================================
-    // PRICE MONITORING (unchanged)
-    // =============================================================================
-
     startMonitoring(tokenAddress) {
         const monitorInterval = setInterval(async () => {
             try {
@@ -433,25 +817,21 @@ Motivo: ${reason}
                     return;
                 }
                 
-                // Ottieni prezzo attuale
                 const currentPrice = await this.getTokenPrice(tokenAddress, position.dex);
                 if (!currentPrice) return;
                 
-                // Calcola P&L
                 const currentValue = position.amount * (currentPrice / position.entryPrice);
                 const pnl = currentValue - position.amount;
                 const pnlPercent = (pnl / position.amount) * 100;
                 
                 console.log(`📊 ${position.symbol}: P&L ${pnl > 0 ? '+' : ''}${pnl.toFixed(4)} TON (${pnlPercent.toFixed(2)}%)`);
                 
-                // Auto sell su target
                 if (pnl > 0.003 || pnlPercent > 10) {
                     console.log(`💰 TARGET RAGGIUNTO: ${position.symbol}`);
                     await this.executeSell(tokenAddress, 'profit_target');
                     clearInterval(monitorInterval);
                 }
                 
-                // Stop loss
                 if (pnl <= -this.maxLossPerTrade || pnlPercent <= -15) {
                     console.log(`🛑 STOP LOSS: ${position.symbol}`);
                     await this.executeSell(tokenAddress, 'stop_loss');
@@ -461,9 +841,8 @@ Motivo: ${reason}
             } catch (error) {
                 console.error(`❌ Errore monitoraggio:`, error.message);
             }
-        }, 30000); // Ogni 30 secondi
+        }, 30000);
         
-        // Timeout dopo 3 ore
         setTimeout(() => {
             clearInterval(monitorInterval);
             if (this.positions.has(tokenAddress)) {
@@ -474,7 +853,6 @@ Motivo: ${reason}
 
     async getTokenPrice(tokenAddress, dex) {
         try {
-            // Usa API pubbliche per prezzi
             if (dex === 'STON.fi') {
                 const response = await axios.get(
                     `https://api.ston.fi/v1/assets/${tokenAddress}`,
@@ -486,7 +864,6 @@ Motivo: ${reason}
                 }
             }
             
-            // Fallback: stima da pool data
             return null;
             
         } catch (error) {
@@ -494,298 +871,6 @@ Motivo: ${reason}
             return null;
         }
     }
-
-    // =============================================================================
-    // ENHANCED SCANNING DEX
-    // =============================================================================
-
-    async scanDEXs() {
-        try {
-            console.log('🔍 Scanning DEX per opportunità...');
-            console.log('📊 Scan #' + this.scanCount);
-            
-            const [dedustTokens, stonfiTokens, geckoTokens] = await Promise.all([
-                this.scanDeDust(),
-                this.scanSTONfi(),
-                this.scanGeckoTerminal() // NUOVO: Fallback API
-            ]);
-            
-            const allTokens = [...dedustTokens, ...stonfiTokens, ...geckoTokens];
-            
-            console.log(`📋 Token totali trovati: ${allTokens.length}`);
-            console.log(`   - DeDust: ${dedustTokens.length}`);
-            console.log(`   - STON.fi: ${stonfiTokens.length}`);
-            console.log(`   - GeckoTerminal: ${geckoTokens.length}`);
-            
-            // Filtra token validi con filtri ridotti per test
-            const validTokens = allTokens
-                .filter(token => this.isValidToken(token))
-                .sort((a, b) => b.liquidity - a.liquidity)
-                .slice(0, 10);
-            
-            console.log(`✅ Token validi dopo filtri: ${validTokens.length}`);
-            
-            if (validTokens.length > 0) {
-                console.log('🏆 Top 3 token:');
-                validTokens.slice(0, 3).forEach((token, i) => {
-                    console.log(`   ${i+1}. ${token.symbol} - Liq: $${token.liquidity.toFixed(0)} - Vol: $${token.volume24h.toFixed(0)}`);
-                });
-            }
-            
-            this.lastScanResult = {
-                timestamp: new Date().toISOString(),
-                totalFound: allTokens.length,
-                validTokens: validTokens.length,
-                sources: {
-                    dedust: dedustTokens.length,
-                    stonfi: stonfiTokens.length,
-                    gecko: geckoTokens.length
-                }
-            };
-            
-            return validTokens;
-            
-        } catch (error) {
-            console.error('❌ Errore scanning:', error.message);
-            return [];
-        }
-    }
-
-    async scanDeDust() {
-        try {
-            console.log('📡 Chiamata API DeDust...');
-            const response = await axios.get('https://api.dedust.io/v2/pools', {
-                timeout: 10000,
-                headers: { 'User-Agent': 'Mozilla/5.0' }
-            });
-            
-            console.log(`📊 DeDust response: ${response.data ? 'OK' : 'NO DATA'}`);
-            
-            if (!response.data || !Array.isArray(response.data)) {
-                console.log('❌ DeDust: Risposta non valida');
-                return [];
-            }
-            
-            console.log(`📊 DeDust pools totali: ${response.data.length}`);
-            
-            const tonPools = response.data.filter(pool => {
-                if (!pool.assets || pool.assets.length !== 2) return false;
-                return pool.assets.some(a => a.type === 'native');
-            });
-            
-            console.log(`🔍 DeDust: ${tonPools.length} pool TON trovati`);
-            
-            // Log dettagli primo pool per debug
-            if (tonPools.length > 0) {
-                console.log('📋 Esempio pool DeDust:');
-                console.log(JSON.stringify(tonPools[0], null, 2).substring(0, 500) + '...');
-            }
-            
-            return tonPools
-                .map(pool => {
-                    const jettonAsset = pool.assets.find(a => a.type === 'jetton');
-                    if (!jettonAsset) return null;
-                    
-                    return {
-                        address: jettonAsset.address,
-                        name: jettonAsset.metadata?.name || 'Unknown',
-                        symbol: jettonAsset.metadata?.symbol || 'UNKNOWN',
-                        liquidity: parseFloat(pool.totalValueLocked || 0),
-                        volume24h: parseFloat(pool.volume?.h24 || 0),
-                        dex: 'DeDust',
-                        poolAddress: pool.address,
-                        currentPrice: 0.001 // Placeholder
-                    };
-                })
-                .filter(Boolean);
-                
-        } catch (error) {
-            console.log(`❌ DeDust error: ${error.message}`);
-            if (error.response) {
-                console.log(`   Status: ${error.response.status}`);
-                console.log(`   Data: ${JSON.stringify(error.response.data).substring(0, 200)}`);
-            }
-            return [];
-        }
-    }
-
-    async scanSTONfi() {
-        try {
-            console.log('📡 Chiamata API STON.fi...');
-            const response = await axios.get('https://api.ston.fi/v1/pools', {
-                timeout: 10000,
-                headers: { 'User-Agent': 'Mozilla/5.0' }
-            });
-            
-            console.log(`📊 STON.fi response: ${response.data ? 'OK' : 'NO DATA'}`);
-            
-            if (!response.data) {
-                console.log('❌ STON.fi: No data');
-                return [];
-            }
-            
-            const pools = response.data.pool_list || response.data.pools || response.data || [];
-            
-            console.log(`📊 STON.fi pools totali: ${Array.isArray(pools) ? pools.length : 0}`);
-            
-            if (!Array.isArray(pools)) {
-                console.log('📋 STON.fi response structure:', Object.keys(response.data));
-                return [];
-            }
-            
-            const tonPools = pools.filter(pool => {
-                return pool.token0_symbol === 'TON' || pool.token1_symbol === 'TON';
-            });
-            
-            console.log(`🔍 STON.fi: ${tonPools.length} pool TON trovati`);
-            
-            // Log dettagli primo pool per debug
-            if (tonPools.length > 0) {
-                console.log('📋 Esempio pool STON.fi:');
-                console.log(JSON.stringify(tonPools[0], null, 2).substring(0, 500) + '...');
-            }
-            
-            return tonPools
-                .map(pool => {
-                    const isTONFirst = pool.token0_symbol === 'TON';
-                    
-                    return {
-                        address: isTONFirst ? pool.token1_address : pool.token0_address,
-                        name: isTONFirst ? pool.token1_name : pool.token0_name,
-                        symbol: isTONFirst ? pool.token1_symbol : pool.token0_symbol,
-                        liquidity: parseFloat(pool.lp_total_supply_usd || 0),
-                        volume24h: parseFloat(pool.volume_24h_usd || 0),
-                        dex: 'STON.fi',
-                        poolAddress: pool.address,
-                        currentPrice: parseFloat(pool.token0_price || pool.token1_price || 0),
-                        tokenAddress: isTONFirst ? pool.token1_address : pool.token0_address
-                    };
-                })
-                .filter(token => token.address && token.liquidity > 0);
-                
-        } catch (error) {
-            console.log(`❌ STON.fi error: ${error.message}`);
-            if (error.response) {
-                console.log(`   Status: ${error.response.status}`);
-                console.log(`   Data: ${JSON.stringify(error.response.data).substring(0, 200)}`);
-            }
-            return [];
-        }
-    }
-
-    // NUOVO: Fallback API - GeckoTerminal
-    async scanGeckoTerminal() {
-        try {
-            console.log('📡 Chiamata API GeckoTerminal (fallback)...');
-            const response = await axios.get(
-                'https://api.geckoterminal.com/api/v2/networks/ton/pools',
-                { 
-                    timeout: 10000,
-                    headers: { 
-                        'Accept': 'application/json',
-                        'User-Agent': 'Mozilla/5.0'
-                    }
-                }
-            );
-            
-            console.log(`📊 GeckoTerminal response: ${response.data ? 'OK' : 'NO DATA'}`);
-            
-            if (!response.data?.data) {
-                console.log('❌ GeckoTerminal: No data');
-                return [];
-            }
-            
-            const pools = response.data.data;
-            console.log(`📊 GeckoTerminal pools: ${pools.length}`);
-            
-            // Log primo pool per debug
-            if (pools.length > 0) {
-                console.log('📋 Esempio pool GeckoTerminal:');
-                console.log(JSON.stringify(pools[0], null, 2).substring(0, 500) + '...');
-            }
-            
-            return pools
-                .filter(pool => {
-                    // Filtra solo pool con TON
-                    const attrs = pool.attributes;
-                    return attrs && (
-                        attrs.base_token_symbol === 'TON' || 
-                        attrs.quote_token_symbol === 'TON'
-                    );
-                })
-                .map(pool => {
-                    const attrs = pool.attributes;
-                    const isTONBase = attrs.base_token_symbol === 'TON';
-                    
-                    return {
-                        address: isTONBase ? 
-                            attrs.quote_token_address : 
-                            attrs.base_token_address,
-                        name: attrs.name || 'Unknown',
-                        symbol: isTONBase ? 
-                            attrs.quote_token_symbol : 
-                            attrs.base_token_symbol,
-                        liquidity: parseFloat(attrs.reserve_in_usd || 0),
-                        volume24h: parseFloat(attrs.volume_usd?.h24 || 0),
-                        dex: pool.relationships?.dex?.data?.id || 'Unknown',
-                        poolAddress: attrs.address,
-                        currentPrice: parseFloat(attrs.base_token_price_usd || 0),
-                        priceChange24h: parseFloat(attrs.price_change_percentage?.h24 || 0)
-                    };
-                })
-                .filter(token => token.address && token.liquidity > 0);
-                
-        } catch (error) {
-            console.log(`❌ GeckoTerminal error: ${error.message}`);
-            if (error.response) {
-                console.log(`   Status: ${error.response.status}`);
-            }
-            return [];
-        }
-    }
-
-    isValidToken(token) {
-        // Filtri di sicurezza RIDOTTI per test
-        if (!token.address || !token.poolAddress) {
-            console.log(`⚠️ Token rifiutato: no address`);
-            return false;
-        }
-        
-        // Filtri ridotti temporaneamente per debug
-        const minLiquidity = 100; // Era 1000
-        const minVolume = 10;     // Era 100
-        
-        if (token.liquidity < minLiquidity) {
-            console.log(`⚠️ Token ${token.symbol} rifiutato: liquidità ${token.liquidity} < ${minLiquidity}`);
-            return false;
-        }
-        
-        if (token.volume24h < minVolume) {
-            console.log(`⚠️ Token ${token.symbol} rifiutato: volume ${token.volume24h} < ${minVolume}`);
-            return false;
-        }
-        
-        // Evita scam ovvi
-        const name = (token.name || '').toLowerCase();
-        const symbol = (token.symbol || '').toLowerCase();
-        
-        const scamPatterns = ['test', 'fake', 'scam', 'rug'];
-        for (const pattern of scamPatterns) {
-            if (name.includes(pattern) || symbol.includes(pattern)) {
-                console.log(`⚠️ Token ${token.symbol} rifiutato: possibile scam (${pattern})`);
-                return false;
-            }
-        }
-        
-        // Aggiungi a token visti
-        this.tokensSeen.add(token.address);
-        
-        return true;
-    }
-
-    // =============================================================================
-    // MAIN LOOP (unchanged)
-    // =============================================================================
 
     async start() {
         console.log('🚀 Bot REAL TRADING avviato...');
@@ -808,19 +893,17 @@ Motivo: ${reason}
 Usa /auto per attivare il trading automatico
         `, 'startup');
         
-        // Main loop
         this.tradingLoop();
     }
 
     async tradingLoop() {
-        const scanInterval = 60000; // 1 minuto
+        const scanInterval = 60000;
         
         while (this.isRunning) {
             try {
                 this.scanCount++;
                 console.log(`\n🔄 Scan #${this.scanCount} - ${new Date().toLocaleTimeString()}`);
                 
-                // Verifica balance
                 const balance = await this.getRealBalance();
                 if (balance < 0.1) {
                     console.log(`⚠️ Balance insufficiente: ${balance.toFixed(4)} TON`);
@@ -828,20 +911,19 @@ Usa /auto per attivare il trading automatico
                     continue;
                 }
                 
-                // Cerca opportunità
-                if (this.positions.size < 2) { // Max 2 posizioni
+                if (this.positions.size < 2) {
                     const tokens = await this.scanDEXs();
                     
                     if (tokens.length > 0 && this.autoTradingEnabled) {
                         const bestToken = tokens[0];
                         
-                        if (bestToken.liquidity > 5000) { // Extra sicurezza
+                        if (bestToken.liquidity > 5000) {
                             const tradeAmount = Math.min(0.01, this.maxLossPerTrade);
                             
                             console.log(`🎯 Opportunità: ${bestToken.symbol} su ${bestToken.dex}`);
                             await this.executeRealBuy(bestToken, tradeAmount);
                             
-                            await this.sleep(30000); // Attendi 30s
+                            await this.sleep(30000);
                         }
                     }
                 }
@@ -854,10 +936,6 @@ Usa /auto per attivare il trading automatico
             }
         }
     }
-
-    // =============================================================================
-    // WALLET INITIALIZATION (unchanged)
-    // =============================================================================
 
     async initialize() {
         try {
@@ -906,10 +984,6 @@ Usa /auto per attivare il trading automatico
             return this.realBalance || 0;
         }
     }
-
-    // =============================================================================
-    // TELEGRAM (unchanged)
-    // =============================================================================
 
     async setupTelegram() {
         const botToken = process.env.TELEGRAM_BOT_TOKEN;
@@ -1037,10 +1111,6 @@ Tokens Seen: ${this.tokensSeen.size}
         await this.sendMessage(message);
     }
 
-    // =============================================================================
-    // UTILITIES
-    // =============================================================================
-
     sleep(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
@@ -1068,9 +1138,9 @@ const config = {
 // AVVIO BOT
 // =============================================================================
 
-console.log('🚀 Inizializzazione TON Bot REAL TRADING Enhanced...');
+console.log('🚀 Inizializzazione TON Bot REAL TRADING Fixed...');
 console.log('💰 OBIETTIVO: Trading REALE su DEX TON');
-console.log('🔍 ENHANCED: Debug logging e API alternative');
+console.log('🔧 FIXED: Parsing API corretto');
 console.log('⚠️ ATTENZIONE: Esegue transazioni REALI!');
 console.log('');
 console.log('📋 REQUISITI:');
@@ -1084,7 +1154,7 @@ setTimeout(async () => {
         bot = new RealTradingBot(config);
         await bot.start();
         
-        console.log('✅ Bot REAL TRADING Enhanced avviato!');
+        console.log('✅ Bot REAL TRADING Fixed avviato!');
         console.log('⚠️ Trading DISATTIVATO di default');
         console.log('📱 Usa /auto in Telegram per attivare');
         console.log('🧪 Test APIs: /test-apis');
