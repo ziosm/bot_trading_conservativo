@@ -104,8 +104,10 @@ class RealTradingBot {
         this.realBalance = 0;
         this.keyPair = null;
         this.autoTradingEnabled = false;
-        this.maxLossPerTrade = 0.01;
+        this.maxLossPerTrade = 0.01; // Max 0.01 TON per trade
         this.slippageTolerance = 0.05;
+        this.maxPositions = 2; // Max 2 posizioni aperte
+        this.minBalanceRequired = 0.5; // Minimo 0.5 TON per operare
         
         // Tracking
         this.tokensSeen = new Set();
@@ -356,15 +358,15 @@ Motivo: ${reason}
                 
                 console.log(`📊 ${position.symbol}: P&L ${pnl > 0 ? '+' : ''}${pnl.toFixed(4)} TON (${pnlPercent.toFixed(2)}%)`);
                 
-                // Take profit
-                if (pnlPercent > 5) {
+                // Take profit più conservativo
+                if (pnlPercent > 3) { // 3% invece di 5%
                     console.log(`💰 TARGET RAGGIUNTO: ${position.symbol}`);
                     await this.executeSell(tokenAddress, 'profit_target');
                     clearInterval(monitorInterval);
                 }
                 
-                // Stop loss
-                if (pnlPercent < -3) {
+                // Stop loss più stretto
+                if (pnlPercent < -2) { // -2% invece di -3%
                     console.log(`🛑 STOP LOSS: ${position.symbol}`);
                     await this.executeSell(tokenAddress, 'stop_loss');
                     clearInterval(monitorInterval);
@@ -392,50 +394,126 @@ Motivo: ${reason}
         try {
             console.log('🔍 Scanning DEX per opportunità...');
             
-            // Per ora usiamo dati di esempio per testare il sistema
-            // In produzione, qui chiameresti le API reali dei DEX
-            const mockTokens = [
-                {
-                    address: 'EQC' + Math.random().toString(36).substring(7),
-                    name: 'Test Token',
-                    symbol: 'TEST',
-                    liquidity: 1000 + Math.random() * 9000,
-                    volume24h: 100 + Math.random() * 900,
-                    dex: Math.random() > 0.5 ? 'DeDust' : 'STON.fi',
-                    poolAddress: 'EQPool' + Math.random().toString(36).substring(7),
-                    currentPrice: 0.001 + Math.random() * 0.01,
-                    tokenAddress: 'EQToken' + Math.random().toString(36).substring(7)
+            // Usa GeckoTerminal API per ottenere pool reali
+            const response = await axios.get(
+                'https://api.geckoterminal.com/api/v2/networks/ton/pools?page=1',
+                { 
+                    timeout: 10000,
+                    headers: { 
+                        'Accept': 'application/json',
+                        'User-Agent': 'Mozilla/5.0'
+                    }
                 }
-            ];
+            );
             
-            // Simuliamo che a volte non troviamo token
-            if (Math.random() > 0.3) {
-                return mockTokens;
+            if (!response.data?.data) {
+                console.log('❌ Nessun dato da GeckoTerminal');
+                return [];
             }
             
-            return [];
+            const pools = response.data.data;
+            console.log(`📊 GeckoTerminal: ${pools.length} pool trovati`);
+            
+            // Filtra solo pool con TON
+            const tonPools = pools.filter(pool => {
+                const attrs = pool.attributes;
+                return attrs && (
+                    attrs.base_token_symbol === 'TON' || 
+                    attrs.quote_token_symbol === 'TON'
+                );
+            });
+            
+            console.log(`🔍 Pool TON trovati: ${tonPools.length}`);
+            
+            // Mappa i pool in formato utilizzabile
+            return tonPools.map(pool => {
+                const attrs = pool.attributes;
+                const isTONBase = attrs.base_token_symbol === 'TON';
+                
+                return {
+                    address: isTONBase ? 
+                        attrs.quote_token_address : 
+                        attrs.base_token_address,
+                    name: attrs.name || 'Unknown',
+                    symbol: isTONBase ? 
+                        attrs.quote_token_symbol : 
+                        attrs.base_token_symbol,
+                    liquidity: parseFloat(attrs.reserve_in_usd || 0),
+                    volume24h: parseFloat(attrs.volume_usd?.h24 || 0),
+                    dex: pool.relationships?.dex?.data?.id || 'Unknown',
+                    poolAddress: attrs.address,
+                    currentPrice: parseFloat(attrs.base_token_price_usd || 0),
+                    tokenAddress: isTONBase ? 
+                        attrs.quote_token_address : 
+                        attrs.base_token_address,
+                    priceChange24h: parseFloat(attrs.price_change_percentage?.h24 || 0)
+                };
+            }).filter(token => token && token.address && token.liquidity > 0);
             
         } catch (error) {
             console.error('❌ Errore scanning:', error.message);
-            return [];
+            
+            // Fallback: prova con API dirette dei DEX
+            try {
+                return await this.scanDEXsDirect();
+            } catch (fallbackError) {
+                console.error('❌ Anche fallback fallito:', fallbackError.message);
+                return [];
+            }
         }
+    }
+    
+    async scanDEXsDirect() {
+        console.log('🔄 Tentativo con API dirette dei DEX...');
+        
+        // Per ora ritorna array vuoto
+        // Qui puoi aggiungere il parsing diretto di DeDust/STON.fi quando funzionano
+        return [];
     }
 
     isValidToken(token) {
-        // Filtri base
+        // Filtri di sicurezza stringenti
         if (!token.address || !token.poolAddress) {
+            console.log(`❌ Token ${token.symbol}: indirizzi mancanti`);
             return false;
         }
         
-        // Filtri liquidità minima
-        if (token.liquidity < 500) {
+        // Blacklist token pericolosi/scam noti
+        const blacklistedSymbols = ['TEST', 'FAKE', 'SCAM', 'RUG', 'HONEYPOT'];
+        if (blacklistedSymbols.some(black => token.symbol.toUpperCase().includes(black))) {
+            console.log(`❌ Token ${token.symbol}: in blacklist`);
             return false;
         }
         
-        // Filtri volume minimo
-        if (token.volume24h < 50) {
+        // Filtri liquidità minima (più alta per sicurezza)
+        const MIN_LIQUIDITY = 5000; // $5,000 USD minimo
+        if (token.liquidity < MIN_LIQUIDITY) {
+            console.log(`❌ Token ${token.symbol}: liquidità troppo bassa (${token.liquidity})`);
             return false;
         }
+        
+        // Filtri volume minimo (per evitare token morti)
+        const MIN_VOLUME = 1000; // $1,000 USD nelle 24h
+        if (token.volume24h < MIN_VOLUME) {
+            console.log(`❌ Token ${token.symbol}: volume troppo basso (${token.volume24h})`);
+            return false;
+        }
+        
+        // Evita token con price change estremi (possibili pump & dump)
+        if (Math.abs(token.priceChange24h) > 50) {
+            console.log(`❌ Token ${token.symbol}: variazione prezzo sospetta (${token.priceChange24h}%)`);
+            return false;
+        }
+        
+        // Controlla che il DEX sia affidabile
+        const trustedDEXs = ['dedust', 'stonfi', 'ston-fi', 'dedust-io'];
+        if (!trustedDEXs.some(dex => token.dex.toLowerCase().includes(dex))) {
+            console.log(`❌ Token ${token.symbol}: DEX non affidabile (${token.dex})`);
+            return false;
+        }
+        
+        // Log token approvato
+        console.log(`✅ Token ${token.symbol} approvato: Liq=${token.liquidity.toFixed(0)}, Vol=${token.volume24h.toFixed(0)}, Change=${token.priceChange24h}%`);
         
         return true;
     }
@@ -477,28 +555,44 @@ Usa /auto per attivare il trading automatico
                 console.log(`\n🔄 Scan #${this.scanCount} - ${new Date().toLocaleTimeString()}`);
                 
                 const balance = await this.getRealBalance();
-                if (balance < 0.1) {
-                    console.log(`⚠️ Balance insufficiente: ${balance.toFixed(4)} TON`);
+                if (balance < this.minBalanceRequired) {
+                    console.log(`⚠️ Balance insufficiente: ${balance.toFixed(4)} TON (minimo: ${this.minBalanceRequired} TON)`);
                     await this.sleep(scanInterval * 5);
                     continue;
                 }
                 
-                if (this.positions.size < 2) {
+                if (this.positions.size < this.maxPositions) {
                     const tokens = await this.scanDEXs();
                     const validTokens = tokens.filter(token => this.isValidToken(token));
                     
                     console.log(`📊 Token trovati: ${tokens.length}, validi: ${validTokens.length}`);
                     
                     if (validTokens.length > 0 && this.autoTradingEnabled) {
+                        // Ordina per liquidità decrescente (più sicuri prima)
+                        validTokens.sort((a, b) => b.liquidity - a.liquidity);
+                        
                         const bestToken = validTokens[0];
                         
-                        const tradeAmount = Math.min(0.01, this.maxLossPerTrade);
+                        // Calcola trade amount basato sul rischio
+                        const tradeAmount = Math.min(
+                            0.01, // Max 0.01 TON
+                            this.maxLossPerTrade,
+                            balance * 0.001 // Max 0.1% del balance
+                        );
                         
                         console.log(`🎯 Opportunità: ${bestToken.symbol} su ${bestToken.dex}`);
+                        console.log(`   Liquidità: ${bestToken.liquidity.toFixed(0)}`);
+                        console.log(`   Volume 24h: ${bestToken.volume24h.toFixed(0)}`);
+                        console.log(`   Trade amount: ${tradeAmount.toFixed(4)} TON`);
+                        
                         await this.executeRealBuy(bestToken, tradeAmount);
                         
                         await this.sleep(30000); // Aspetta 30 secondi prima del prossimo trade
+                    } else if (validTokens.length === 0) {
+                        console.log('   ⚠️ Nessun token passa i filtri di sicurezza');
                     }
+                } else {
+                    console.log(`   ⚠️ Raggiunto limite posizioni (${this.positions.size}/${this.maxPositions})`);
                 }
                 
                 await this.sleep(scanInterval);
