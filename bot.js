@@ -314,15 +314,38 @@ class RealTradingBot {
                 const firstPool = pools[0];
                 console.log('   Keys:', Object.keys(firstPool));
                 console.log('   Sample pool:', JSON.stringify(firstPool, null, 2).substring(0, 800));
+                
+                // Trova un pool con TON per esempio
+                const tonPool = pools.find(p => p.assets?.some(a => a.type === 'native'));
+                if (tonPool) {
+                    console.log('   TON pool example:', JSON.stringify(tonPool, null, 2).substring(0, 800));
+                }
             }
             
-            // Filtra pool TON
+            // Filtra pool TON - DeDust usa type "native" per TON
             const tonPools = pools.filter(pool => {
                 if (!pool.assets || pool.assets.length !== 2) return false;
-                return pool.assets.some(a => a.type === 'native' || a.symbol === 'TON');
+                // Cerca specificamente il type "native" che indica TON
+                // O un asset senza address (potrebbe essere TON)
+                return pool.assets.some(a => 
+                    a.type === 'native' || 
+                    (!a.address && (a.symbol === 'TON' || a.metadata?.symbol === 'TON'))
+                );
             });
             
             console.log(`🔍 DeDust: ${tonPools.length} pool TON trovati`);
+            
+            // Debug: mostra info sui primi pool TON
+            if (tonPools.length > 0) {
+                console.log('📋 Primi 3 pool TON:');
+                tonPools.slice(0, 3).forEach((pool, i) => {
+                    console.log(`   Pool ${i+1}:`, {
+                        address: pool.address,
+                        assets: pool.assets.map(a => ({type: a.type, symbol: a.metadata?.symbol})),
+                        reserves: pool.reserves
+                    });
+                });
+            }
             
             return tonPools.map(pool => {
                 try {
@@ -332,15 +355,24 @@ class RealTradingBot {
                     
                     // Trova quale asset è TON e quale è il token
                     pool.assets.forEach((asset, index) => {
-                        if (asset.type === 'native' || asset.symbol === 'TON') {
+                        if (asset.type === 'native' || 
+                            (!asset.address && (asset.symbol === 'TON' || asset.metadata?.symbol === 'TON'))) {
+                            // Questo è TON
                             tonIndex = index;
-                        } else if (asset.type === 'jetton' || asset.address) {
+                        } else if (asset.type === 'jetton' && asset.address) {
+                            // Questo è il token
                             tokenInfo = asset;
                             tokenIndex = index;
                         }
                     });
                     
-                    if (!tokenInfo || tonIndex === -1 || tokenIndex === -1) return null;
+                    if (!tokenInfo || tonIndex === -1 || tokenIndex === -1) {
+                        // Debug: log perché è stato scartato
+                        if (!tokenInfo) console.log('⚠️ Pool scartato: no tokenInfo');
+                        if (tonIndex === -1) console.log('⚠️ Pool scartato: TON non trovato');
+                        if (tokenIndex === -1) console.log('⚠️ Pool scartato: token index non trovato');
+                        return null;
+                    }
                     
                     // Le reserve sono nell'array pool.reserves nello stesso ordine degli assets
                     const tonReserve = parseFloat(pool.reserves[tonIndex] || 0) / 1e9; // Converti da nanoton
