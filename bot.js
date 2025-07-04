@@ -294,7 +294,6 @@ class RealTradingBot {
             console.log(`📊 DeDust response type: ${typeof response.data}`);
             console.log(`📊 DeDust is array: ${Array.isArray(response.data)}`);
             
-            // Se non è un array, potrebbe essere un oggetto con pools dentro
             let pools = [];
             if (Array.isArray(response.data)) {
                 pools = response.data;
@@ -309,59 +308,83 @@ class RealTradingBot {
             
             console.log(`📊 DeDust pools: ${pools.length}`);
             
-            // Log struttura primo pool
+            // Log struttura primo pool per capire i campi
             if (pools.length > 0) {
                 console.log('📋 DeDust pool structure:');
-                console.log(JSON.stringify(pools[0], null, 2).substring(0, 500));
+                const firstPool = pools[0];
+                console.log('   Keys:', Object.keys(firstPool));
+                console.log('   Sample pool:', JSON.stringify(firstPool, null, 2).substring(0, 800));
             }
             
-            // Prova a identificare pool TON con parsing più flessibile
+            // Filtra pool TON
             const tonPools = pools.filter(pool => {
-                // Cerca TON in vari modi possibili
-                const hasNative = pool.assets?.some(a => a.type === 'native' || a.symbol === 'TON');
-                const hasTON = JSON.stringify(pool).toLowerCase().includes('ton');
-                return hasNative || hasTON;
+                if (!pool.assets || pool.assets.length !== 2) return false;
+                return pool.assets.some(a => a.type === 'native' || a.symbol === 'TON');
             });
             
             console.log(`🔍 DeDust: ${tonPools.length} pool TON trovati`);
             
             return tonPools.map(pool => {
                 try {
-                    // Parsing più flessibile
                     let tokenInfo = null;
-                    let tonInfo = null;
+                    let tonReserve = 0;
+                    let tokenReserve = 0;
                     
-                    // Cerca asset TON e token
-                    if (pool.assets && Array.isArray(pool.assets)) {
-                        pool.assets.forEach(asset => {
-                            if (asset.type === 'native' || asset.symbol === 'TON') {
-                                tonInfo = asset;
-                            } else if (asset.type === 'jetton' || asset.address) {
-                                tokenInfo = asset;
-                            }
-                        });
-                    }
+                    // Trova asset TON e token
+                    pool.assets.forEach(asset => {
+                        if (asset.type === 'native' || asset.symbol === 'TON') {
+                            // Questo è TON
+                            tonReserve = parseFloat(asset.reserve || 0) / 1e9; // Converti da nanoton
+                        } else if (asset.type === 'jetton' || asset.address) {
+                            // Questo è il token
+                            tokenInfo = asset;
+                            const decimals = asset.metadata?.decimals || 9;
+                            tokenReserve = parseFloat(asset.reserve || 0) / Math.pow(10, decimals);
+                        }
+                    });
                     
                     if (!tokenInfo) return null;
+                    
+                    // Calcola liquidità in USD (assumendo 1 TON = ~$5)
+                    const tonPriceUSD = 5; // Prezzo approssimativo
+                    const liquidityUSD = tonReserve * tonPriceUSD * 2; // *2 perché è il valore totale del pool
+                    
+                    // Calcola volume dalle stats se disponibili
+                    let volume24h = 0;
+                    if (pool.stats) {
+                        volume24h = parseFloat(pool.stats.volume_24h || pool.stats.volume || 0);
+                    } else if (pool.volume) {
+                        volume24h = parseFloat(pool.volume.h24 || pool.volume['24h'] || pool.volume || 0);
+                    }
+                    
+                    // Calcola prezzo del token in TON
+                    const tokenPrice = tonReserve > 0 && tokenReserve > 0 ? 
+                        tonReserve / tokenReserve : 0;
                     
                     return {
                         address: tokenInfo.address || pool.address,
                         name: tokenInfo.metadata?.name || tokenInfo.name || 'Unknown',
                         symbol: tokenInfo.metadata?.symbol || tokenInfo.symbol || 'UNKNOWN',
-                        liquidity: parseFloat(pool.totalValueLocked || pool.tvl || pool.liquidity || 0),
-                        volume24h: parseFloat(pool.volume?.h24 || pool.volume24h || pool.volume || 0),
+                        liquidity: liquidityUSD,
+                        volume24h: volume24h,
                         dex: 'DeDust',
                         poolAddress: pool.address,
-                        currentPrice: parseFloat(pool.price || 0.001)
+                        currentPrice: tokenPrice,
+                        tonReserve: tonReserve,
+                        tokenReserve: tokenReserve
                     };
                 } catch (e) {
                     console.error('❌ Error parsing DeDust pool:', e.message);
                     return null;
                 }
-            }).filter(Boolean);
+            }).filter(token => token && token.liquidity > 0); // Filtra solo token con liquidità > 0
             
         } catch (error) {
             console.log(`❌ DeDust error: ${error.message}`);
+            if (error.response) {
+                console.log(`   Status: ${error.response.status}`);
+                console.log(`   Data: ${JSON.stringify(error.response.data).substring(0, 200)}`);
+            }
             return [];
         }
     }
@@ -413,17 +436,17 @@ class RealTradingBot {
             // Log struttura primo pool
             if (pools.length > 0) {
                 console.log('📋 STON.fi pool structure:');
-                console.log(JSON.stringify(pools[0], null, 2).substring(0, 500));
+                const firstPool = pools[0];
+                console.log('   Keys:', Object.keys(firstPool));
+                console.log('   Sample pool:', JSON.stringify(firstPool, null, 2).substring(0, 800));
             }
             
-            // Filtra pool TON con parsing flessibile
+            // Filtra pool TON
             const tonPools = pools.filter(pool => {
-                const hasTON = pool.token0_symbol === 'TON' || 
-                               pool.token1_symbol === 'TON' ||
-                               pool.base_symbol === 'TON' ||
-                               pool.quote_symbol === 'TON' ||
-                               JSON.stringify(pool).includes('TON');
-                return hasTON;
+                return pool.token0_symbol === 'TON' || 
+                       pool.token1_symbol === 'TON' ||
+                       pool.base_symbol === 'TON' ||
+                       pool.quote_symbol === 'TON';
             });
             
             console.log(`🔍 STON.fi: ${tonPools.length} pool TON trovati`);
@@ -431,14 +454,21 @@ class RealTradingBot {
             return tonPools.map(pool => {
                 try {
                     // Determina quale token è TON
-                    let isTONFirst = pool.token0_symbol === 'TON' || pool.base_symbol === 'TON';
-                    let tokenSymbol, tokenName, tokenAddress, liquidity, volume;
+                    const isTONFirst = pool.token0_symbol === 'TON' || pool.base_symbol === 'TON';
+                    
+                    let tokenSymbol, tokenName, tokenAddress;
+                    let tonReserve = 0;
+                    let tokenReserve = 0;
                     
                     if (pool.token0_symbol && pool.token1_symbol) {
                         // Formato standard
                         tokenSymbol = isTONFirst ? pool.token1_symbol : pool.token0_symbol;
                         tokenName = isTONFirst ? pool.token1_name : pool.token0_name;
                         tokenAddress = isTONFirst ? pool.token1_address : pool.token0_address;
+                        
+                        // Reserves
+                        tonReserve = parseFloat(isTONFirst ? pool.reserve0 : pool.reserve1) / 1e9;
+                        tokenReserve = parseFloat(isTONFirst ? pool.reserve1 : pool.reserve0) / 1e9; // Assumiamo 9 decimali
                     } else if (pool.base_symbol && pool.quote_symbol) {
                         // Formato alternativo
                         isTONFirst = pool.base_symbol === 'TON';
@@ -447,21 +477,27 @@ class RealTradingBot {
                         tokenAddress = isTONFirst ? pool.quote_address : pool.base_address;
                     }
                     
-                    // Liquidity e volume con nomi diversi
-                    liquidity = parseFloat(
-                        pool.lp_total_supply_usd || 
-                        pool.liquidity_usd || 
-                        pool.tvl_usd || 
-                        pool.liquidity || 
-                        0
-                    );
+                    // Se abbiamo lp_total_supply_usd, usiamo quello per la liquidità
+                    let liquidity = parseFloat(pool.lp_total_supply_usd || 0);
                     
-                    volume = parseFloat(
+                    // Altrimenti calcoliamo dalla reserve
+                    if (liquidity === 0 && tonReserve > 0) {
+                        const tonPriceUSD = 5; // Prezzo approssimativo
+                        liquidity = tonReserve * tonPriceUSD * 2;
+                    }
+                    
+                    // Volume
+                    const volume = parseFloat(
                         pool.volume_24h_usd || 
                         pool.volume_24h || 
                         pool.volume || 
                         0
                     );
+                    
+                    // Prezzo del token
+                    const tokenPrice = tonReserve > 0 && tokenReserve > 0 ? 
+                        tonReserve / tokenReserve : 
+                        parseFloat(pool.token0_price || pool.token1_price || pool.price || 0);
                     
                     return {
                         address: tokenAddress || pool.address,
@@ -471,17 +507,23 @@ class RealTradingBot {
                         volume24h: volume,
                         dex: 'STON.fi',
                         poolAddress: pool.address || pool.pool_address,
-                        currentPrice: parseFloat(pool.token0_price || pool.token1_price || pool.price || 0),
-                        tokenAddress: tokenAddress
+                        currentPrice: tokenPrice,
+                        tokenAddress: tokenAddress,
+                        tonReserve: tonReserve,
+                        tokenReserve: tokenReserve
                     };
                 } catch (e) {
                     console.error('❌ Error parsing STON.fi pool:', e.message);
                     return null;
                 }
-            }).filter(token => token && token.address && token.symbol !== 'UNKNOWN');
+            }).filter(token => token && token.address && token.symbol !== 'UNKNOWN' && token.liquidity > 0);
             
         } catch (error) {
             console.log(`❌ STON.fi error: ${error.message}`);
+            if (error.response) {
+                console.log(`   Status: ${error.response.status}`);
+                console.log(`   Data: ${JSON.stringify(error.response.data).substring(0, 200)}`);
+            }
             return [];
         }
     }
@@ -570,17 +612,20 @@ class RealTradingBot {
             return false;
         }
         
+        // Log token con liquidità > 0 per debug
+        if (token.liquidity > 0) {
+            console.log(`✅ Token ${token.symbol}: Liq=$${token.liquidity.toFixed(0)}, Vol=$${token.volume24h.toFixed(0)}`);
+        }
+        
         // Filtri temporaneamente molto bassi per debug
-        const minLiquidity = 10;   // Molto basso per test
-        const minVolume = 1;       // Molto basso per test
+        const minLiquidity = 100;   // $100 USD
+        const minVolume = 10;       // $10 USD
         
         if (token.liquidity < minLiquidity) {
-            console.log(`⚠️ Token ${token.symbol} rifiutato: liquidità ${token.liquidity} < ${minLiquidity}`);
             return false;
         }
         
         if (token.volume24h < minVolume) {
-            console.log(`⚠️ Token ${token.symbol} rifiutato: volume ${token.volume24h} < ${minVolume}`);
             return false;
         }
         
@@ -598,6 +643,8 @@ class RealTradingBot {
         
         // Aggiungi a token visti
         this.tokensSeen.add(token.address);
+        
+        console.log(`✅ Token ${token.symbol} VALIDO: Liq=$${token.liquidity.toFixed(0)}, Vol=$${token.volume24h.toFixed(0)}`);
         
         return true;
     }
