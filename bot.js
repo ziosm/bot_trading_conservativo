@@ -138,9 +138,10 @@ class ConservativeTONBot {
         
         if (botToken && chatId) {
             try {
-                this.telegram = new TelegramBot(botToken, { polling: true });
+                // DISABILITA POLLING per evitare conflitti 409
+                this.telegram = new TelegramBot(botToken, { polling: false });
                 this.telegramChatId = chatId;
-                console.log('📱 Telegram notifications abilitato');
+                console.log('📱 Telegram configurato (polling disabled - evita conflitti)');
                 
                 // Setup comandi Telegram
                 this.setupTelegramCommands();
@@ -611,30 +612,58 @@ Deploy: 🌐 Render Cloud
 
     async scanDeDust() {
         try {
-            // API DeDust reale
+            console.log('   🔍 Tentativo connessione DeDust API...');
+            
+            // API DeDust reale con timeout più lungo e headers migliori
             const response = await axios.get('https://api.dedust.io/v2/pools', {
-                timeout: 10000,
+                timeout: 15000,
                 headers: {
-                    'User-Agent': 'TON-Conservative-Bot/1.0'
+                    'User-Agent': 'Mozilla/5.0 (TON-Bot/1.0)',
+                    'Accept': 'application/json',
+                    'Accept-Language': 'en-US,en;q=0.9'
                 }
             });
             
+            console.log(`   📡 DeDust API Response Status: ${response.status}`);
+            
             if (!response.data || !Array.isArray(response.data)) {
-                console.log('   ⚠️ DeDust: Risposta API non valida');
+                console.log('   ⚠️ DeDust: Formato risposta non valido');
+                console.log('   📄 Response type:', typeof response.data);
                 return [];
             }
             
+            console.log(`   📊 DeDust: ${response.data.length} pool totali nel database`);
+            
+            // Filtri più permissivi per test
             const recentPools = response.data.filter(pool => {
-                const isRecent = Date.now() - (pool.created_at || 0) < 24 * 60 * 60 * 1000;
-                const hasTON = pool.assets && pool.assets.some(asset => 
-                    asset.symbol === 'TON' || asset.symbol === 'WTON'
-                );
-                const hasLiquidity = pool.total_liquidity_usd > 1000;
+                // Rilassa i filtri per vedere cosa trova
+                const hasAssets = pool.assets && Array.isArray(pool.assets);
+                const hasLiquidity = pool.total_liquidity_usd > 100; // Ridotto da 1000
+                const isRecent = Date.now() - (pool.created_at || 0) < 7 * 24 * 60 * 60 * 1000; // 7 giorni invece di 1
                 
-                return isRecent && hasTON && hasLiquidity;
+                if (!hasAssets) return false;
+                
+                const hasTON = pool.assets.some(asset => 
+                    asset.symbol === 'TON' || 
+                    asset.symbol === 'WTON' || 
+                    asset.name?.toLowerCase().includes('ton')
+                );
+                
+                if (hasAssets && hasLiquidity && hasTON) {
+                    console.log(`   🔍 Pool candidata: ${pool.assets.map(a => a.symbol).join('-')} | Liquidity: ${pool.total_liquidity_usd} | Age: ${Math.floor((Date.now() - pool.created_at) / (24*60*60*1000))} giorni`);
+                }
+                
+                return hasAssets && hasLiquidity && hasTON && isRecent;
             });
             
-            console.log(`   📊 DeDust: ${recentPools.length} pool recenti trovate`);
+            console.log(`   📈 DeDust: ${recentPools.length} pool filtrate trovate`);
+            
+            if (recentPools.length === 0 && response.data.length > 0) {
+                console.log('   ℹ️ Nessuna pool recente, ma API funziona. Possibili cause:');
+                console.log('   - Poche nuove pool nelle ultime 7 giorni');
+                console.log('   - Filtri troppo restrittivi');
+                console.log('   - Mercato meme coin temporaneamente calmo');
+            }
             
             return recentPools.map(pool => ({
                 address: pool.assets.find(a => a.symbol !== 'TON' && a.symbol !== 'WTON')?.address || '',
@@ -648,7 +677,15 @@ Deploy: 🌐 Render Cloud
             })).filter(token => token.address && token.symbol !== 'UNK');
             
         } catch (error) {
-            console.log('   ⚠️ DeDust API non disponibile:', error.message);
+            console.log('   ❌ DeDust API Error:', error.message);
+            if (error.response) {
+                console.log('   📄 Response Status:', error.response.status);
+                console.log('   📄 Response Headers:', error.response.headers);
+            }
+            console.log('   💡 Possibili soluzioni:');
+            console.log('   - API temporaneamente non disponibile');
+            console.log('   - Rate limiting attivo');
+            console.log('   - Cambio di endpoint API');
             return [];
         }
     }
