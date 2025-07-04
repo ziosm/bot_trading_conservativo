@@ -531,8 +531,8 @@ Motivo: ${reason}
             return false;
         }
         
-        // Controlla che il DEX sia affidabile (temporaneamente più permissivo)
-        const trustedDEXs = ['dedust', 'stonfi', 'ston-fi', 'dedust-io', 'geckoterminal', 'unknown'];
+        // Controlla che il DEX sia affidabile
+        const trustedDEXs = ['dedust', 'stonfi', 'ston-fi', 'ston.fi', 'dedust-io', 'geckoterminal', 'unknown'];
         const dexLower = token.dex.toLowerCase();
         if (!trustedDEXs.some(dex => dexLower.includes(dex))) {
             console.log(`❌ Token ${token.symbol}: DEX non affidabile (${token.dex})`);
