@@ -414,90 +414,64 @@ Motivo: ${reason}
             const pools = response.data.data;
             console.log(`📊 GeckoTerminal: ${pools.length} pool trovati`);
             
-            // Debug: mostra i primi 3 pool per capire la struttura
+            // Debug: mostra struttura completa del primo pool
             if (pools.length > 0) {
-                console.log('🔍 Esempio pool:');
+                console.log('🔍 Struttura pool completa:');
                 const firstPool = pools[0];
-                console.log(`   Nome: ${firstPool.attributes?.name}`);
-                console.log(`   Base: ${firstPool.attributes?.base_token_symbol}`);
-                console.log(`   Quote: ${firstPool.attributes?.quote_token_symbol}`);
+                console.log(JSON.stringify(firstPool, null, 2).substring(0, 1000));
             }
             
-            // Filtra pool con TON - prova varie varianti
-            const tonVariants = ['TON', 'WTON', 'PTON', 'TONCOIN'];
-            const tonPools = pools.filter(pool => {
-                const attrs = pool.attributes;
-                if (!attrs) return false;
-                
-                const baseSymbol = attrs.base_token_symbol?.toUpperCase() || '';
-                const quoteSymbol = attrs.quote_token_symbol?.toUpperCase() || '';
-                
-                return tonVariants.some(variant => 
-                    baseSymbol.includes(variant) || quoteSymbol.includes(variant)
-                );
-            });
-            
-            console.log(`🔍 Pool TON trovati: ${tonPools.length}`);
-            
-            // Se non trova pool TON, mostra tutti i simboli per debug
-            if (tonPools.length === 0 && pools.length > 0) {
-                console.log('⚠️ Nessun pool TON trovato. Simboli disponibili:');
-                const symbols = new Set();
-                pools.slice(0, 10).forEach(pool => {
-                    if (pool.attributes?.base_token_symbol) symbols.add(pool.attributes.base_token_symbol);
-                    if (pool.attributes?.quote_token_symbol) symbols.add(pool.attributes.quote_token_symbol);
-                });
-                console.log(`   Simboli unici: ${Array.from(symbols).join(', ')}`);
-            }
-            
-            // Mappa i pool in formato utilizzabile
-            const mappedTokens = tonPools.map(pool => {
-                const attrs = pool.attributes;
-                const baseUpper = attrs.base_token_symbol?.toUpperCase() || '';
-                const isTONBase = tonVariants.some(v => baseUpper.includes(v));
-                
-                return {
-                    address: isTONBase ? 
-                        attrs.quote_token_address : 
-                        attrs.base_token_address,
-                    name: attrs.name || 'Unknown',
-                    symbol: isTONBase ? 
-                        attrs.quote_token_symbol : 
-                        attrs.base_token_symbol,
-                    liquidity: parseFloat(attrs.reserve_in_usd || 0),
-                    volume24h: parseFloat(attrs.volume_usd?.h24 || 0),
-                    dex: pool.relationships?.dex?.data?.id || 'Unknown',
-                    poolAddress: attrs.address,
-                    currentPrice: parseFloat(attrs.base_token_price_usd || 0),
-                    tokenAddress: isTONBase ? 
-                        attrs.quote_token_address : 
-                        attrs.base_token_address,
-                    priceChange24h: parseFloat(attrs.price_change_percentage?.h24 || 0)
-                };
-            }).filter(token => token && token.address && token.liquidity > 0);
-            
-            // Se ancora non trova nulla, usa i pool più liquidi come fallback
-            if (mappedTokens.length === 0 && pools.length > 0) {
-                console.log('🔄 Fallback: usando i pool più liquidi...');
-                const liquidPools = pools
-                    .filter(p => parseFloat(p.attributes?.reserve_in_usd || 0) > 5000)
-                    .slice(0, 5);
-                
-                return liquidPools.map(pool => {
-                    const attrs = pool.attributes;
+            // Mappa tutti i pool con liquidità sufficiente
+            const mappedTokens = pools
+                .filter(pool => {
+                    const attrs = pool.attributes || {};
+                    const liquidity = parseFloat(attrs.reserve_in_usd || attrs.fdv_usd || 0);
+                    return liquidity > 5000; // Solo pool con almeno $5k
+                })
+                .map(pool => {
+                    const attrs = pool.attributes || {};
+                    
+                    // Estrai informazioni dal nome del pool
+                    const poolName = attrs.name || '';
+                    const tokens = poolName.split('/').map(t => t.trim());
+                    
+                    // Determina quale token non è TON/USDT/USDC
+                    let targetToken = tokens[0];
+                    if (targetToken === 'TON' || targetToken === 'USD₮' || targetToken === 'USDT' || targetToken === 'USDC') {
+                        targetToken = tokens[1] || tokens[0];
+                    }
+                    
                     return {
-                        address: attrs.base_token_address || attrs.quote_token_address,
-                        name: attrs.name || 'Unknown',
-                        symbol: attrs.base_token_symbol || attrs.quote_token_symbol || 'UNKNOWN',
-                        liquidity: parseFloat(attrs.reserve_in_usd || 0),
+                        address: attrs.address || pool.id,
+                        name: poolName,
+                        symbol: targetToken,
+                        liquidity: parseFloat(attrs.reserve_in_usd || attrs.fdv_usd || 0),
                         volume24h: parseFloat(attrs.volume_usd?.h24 || 0),
                         dex: 'GeckoTerminal',
-                        poolAddress: attrs.address,
-                        currentPrice: parseFloat(attrs.base_token_price_usd || 0),
-                        tokenAddress: attrs.base_token_address || attrs.quote_token_address,
+                        poolAddress: attrs.address || pool.id,
+                        currentPrice: parseFloat(attrs.price_usd || attrs.base_token_price_usd || 0),
+                        tokenAddress: attrs.address || pool.id,
                         priceChange24h: parseFloat(attrs.price_change_percentage?.h24 || 0)
                     };
-                }).filter(token => token && token.address);
+                })
+                .filter(token => {
+                    // Filtra token validi
+                    return token && 
+                           token.address && 
+                           token.liquidity > 0 &&
+                           token.symbol !== 'TON' &&
+                           token.symbol !== 'USD₮' &&
+                           token.symbol !== 'USDT' &&
+                           token.symbol !== 'USDC';
+                });
+            
+            console.log(`📊 Token mappati: ${mappedTokens.length}`);
+            
+            if (mappedTokens.length > 0) {
+                console.log('🎯 Primi 3 token trovati:');
+                mappedTokens.slice(0, 3).forEach(token => {
+                    console.log(`   ${token.symbol}: Liq=${token.liquidity.toFixed(0)}, Vol=${token.volume24h.toFixed(0)}`);
+                });
             }
             
             return mappedTokens;
