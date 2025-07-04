@@ -424,60 +424,90 @@ Motivo: ${reason}
         try {
             console.log('📡 Chiamata API STON.fi...');
             
-            // API STON.fi per i pool
-            const response = await axios.get('https://api.ston.fi/v1/markets', {
-                timeout: 10000,
-                headers: { 'User-Agent': 'Mozilla/5.0' }
-            });
+            // Prova endpoint diversi di STON.fi
+            let response;
+            try {
+                // Primo tentativo: pools
+                response = await axios.get('https://api.ston.fi/v1/pools', {
+                    timeout: 10000,
+                    headers: { 'User-Agent': 'Mozilla/5.0' }
+                });
+            } catch (e) {
+                // Secondo tentativo: assets
+                console.log('🔄 Tentativo con endpoint assets...');
+                response = await axios.get('https://api.ston.fi/v1/assets', {
+                    timeout: 10000,
+                    headers: { 'User-Agent': 'Mozilla/5.0' }
+                });
+            }
             
             if (!response.data) {
                 console.log('❌ STON.fi: Nessun dato');
                 return [];
             }
             
-            // Filtra solo pool con TON
-            const markets = Array.isArray(response.data) ? response.data : [];
-            const tonMarkets = markets.filter(market => 
-                market.quote_asset_address === 'ton' || 
-                market.base_asset_address === 'ton'
-            );
-            
-            console.log(`🔍 STON.fi: ${tonMarkets.length} mercati TON trovati`);
-            
-            // Mappa i mercati in token
-            return tonMarkets
-                .map(market => {
-                    const isTonBase = market.base_asset_address === 'ton';
-                    const tokenAddress = isTonBase ? 
-                        market.quote_asset_address : 
-                        market.base_asset_address;
-                    
-                    const tokenSymbol = isTonBase ? 
-                        market.quote_asset_symbol : 
-                        market.base_asset_symbol;
-                    
-                    const tokenName = isTonBase ? 
-                        market.quote_asset_name : 
-                        market.base_asset_name;
-                    
-                    return {
-                        address: tokenAddress,
-                        name: tokenName || tokenSymbol || 'Unknown',
-                        symbol: tokenSymbol || 'UNK',
-                        liquidity: parseFloat(market.liquidity_usd || 0),
-                        volume24h: parseFloat(market.volume_24h_usd || 0),
-                        dex: 'STON.fi',
-                        poolAddress: market.pool_address,
-                        currentPrice: parseFloat(market.price_usd || 0),
-                        tokenAddress: tokenAddress,
-                        priceChange24h: parseFloat(market.price_change_24h || 0)
-                    };
-                })
-                .filter(token => 
-                    token.address && 
-                    token.address !== 'ton' &&
-                    token.liquidity > 0
+            // Gestisci diverse strutture di risposta
+            let pools = [];
+            if (response.data.pool_list) {
+                pools = response.data.pool_list;
+            } else if (Array.isArray(response.data)) {
+                pools = response.data;
+            } else if (response.data.assets) {
+                // Se abbiamo assets, filtra quelli con pool TON
+                const assets = response.data.assets;
+                const tonAssets = Object.values(assets).filter(asset => 
+                    asset.pools && asset.pools.some(p => 
+                        p.includes('TON') || p.includes('STON.fi TON')
+                    )
                 );
+                
+                console.log(`🔍 STON.fi: ${tonAssets.length} asset con pool TON`);
+                
+                return tonAssets.map(asset => ({
+                    address: asset.contract_address,
+                    name: asset.display_name || asset.symbol,
+                    symbol: asset.symbol,
+                    liquidity: parseFloat(asset.tvl || 0),
+                    volume24h: parseFloat(asset.volume_24h || 0),
+                    dex: 'STON.fi',
+                    poolAddress: asset.default_pool || asset.contract_address,
+                    currentPrice: parseFloat(asset.price || 0),
+                    tokenAddress: asset.contract_address,
+                    priceChange24h: parseFloat(asset.price_change_24h || 0)
+                })).filter(token => token.liquidity > 5000);
+            }
+            
+            // Se abbiamo pools, processali
+            if (pools.length > 0) {
+                console.log(`🔍 STON.fi: ${pools.length} pool trovati`);
+                
+                // Filtra pool con TON
+                const tonPools = pools.filter(pool => 
+                    pool.token0_symbol === 'TON' || 
+                    pool.token1_symbol === 'TON' ||
+                    pool.reserve0_token === 'TON' ||
+                    pool.reserve1_token === 'TON'
+                );
+                
+                return tonPools.map(pool => {
+                    const isToken0TON = pool.token0_symbol === 'TON';
+                    return {
+                        address: isToken0TON ? pool.token1_address : pool.token0_address,
+                        name: isToken0TON ? pool.token1_name : pool.token0_name,
+                        symbol: isToken0TON ? pool.token1_symbol : pool.token0_symbol,
+                        liquidity: parseFloat(pool.lp_total_supply_usd || 0),
+                        volume24h: parseFloat(pool.volume_24h_usd || 0),
+                        dex: 'STON.fi',
+                        poolAddress: pool.address,
+                        currentPrice: 0,
+                        tokenAddress: isToken0TON ? pool.token1_address : pool.token0_address,
+                        priceChange24h: 0
+                    };
+                }).filter(token => token.address && token.liquidity > 0);
+            }
+            
+            console.log('❌ STON.fi: Struttura API non riconosciuta');
+            return [];
                 
         } catch (error) {
             console.log(`❌ Errore STON.fi: ${error.message}`);
@@ -510,19 +540,30 @@ Motivo: ${reason}
             
             console.log(`🔍 DeDust: ${tonPools.length} pool TON trovati`);
             
+            // Debug: mostra struttura del primo pool TON
+            if (tonPools.length > 0) {
+                console.log('📋 Esempio pool DeDust:');
+                console.log(JSON.stringify(tonPools[0], null, 2).substring(0, 500));
+            }
+            
             // Mappa i pool in token
-            return tonPools
-                .map(pool => {
+            const mappedTokens = [];
+            
+            for (const pool of tonPools.slice(0, 100)) { // Processa solo i primi 100
+                try {
                     // Trova quale asset è il token (non TON)
-                    const tokenAsset = pool.assets.find(asset => asset.type !== 'native');
-                    if (!tokenAsset || !tokenAsset.address) return null;
-                    
-                    // Calcola liquidità (TON * 2 * prezzo TON)
+                    const tokenAsset = pool.assets.find(asset => asset.type === 'jetton');
                     const tonAsset = pool.assets.find(asset => asset.type === 'native');
-                    const tonAmount = tonAsset ? parseFloat(tonAsset.amount || 0) / 1e9 : 0;
-                    const liquidityUsd = tonAmount * 2 * 2.76; // Assumendo TON = $2.76
                     
-                    return {
+                    if (!tokenAsset || !tonAsset) continue;
+                    
+                    // Calcola liquidità
+                    const tonReserve = parseFloat(pool.reserves?.[tonAsset.type === pool.assets[0].type ? 0 : 1] || 0) / 1e9;
+                    const liquidityUsd = tonReserve * 2 * 2.76; // TON = $2.76
+                    
+                    if (liquidityUsd < 5000) continue; // Skip pool piccoli
+                    
+                    const token = {
                         address: tokenAsset.address,
                         name: tokenAsset.metadata?.name || 'Unknown',
                         symbol: tokenAsset.metadata?.symbol || 'UNK',
@@ -534,8 +575,19 @@ Motivo: ${reason}
                         tokenAddress: tokenAsset.address,
                         priceChange24h: 0
                     };
-                })
-                .filter(token => token && token.address && token.liquidity > 0);
+                    
+                    if (token.address && token.symbol !== 'UNK') {
+                        mappedTokens.push(token);
+                        console.log(`✅ Token trovato: ${token.symbol} - Liq: ${token.liquidity.toFixed(0)}`);
+                    }
+                    
+                } catch (e) {
+                    // Ignora errori singoli pool
+                }
+            }
+            
+            console.log(`📊 DeDust: ${mappedTokens.length} token mappati con successo`);
+            return mappedTokens;
                 
         } catch (error) {
             console.log(`❌ Errore DeDust: ${error.message}`);
