@@ -392,109 +392,155 @@ Motivo: ${reason}
 
     async scanDEXs() {
         try {
-            console.log('🔍 Scanning DEX per opportunità...');
+            console.log('🔍 Scanning DEX per opportunità REALI...');
             
-            // Usa GeckoTerminal API per ottenere pool reali
-            const response = await axios.get(
-                'https://api.geckoterminal.com/api/v2/networks/ton/pools?page=1',
-                { 
-                    timeout: 10000,
-                    headers: { 
-                        'Accept': 'application/json',
-                        'User-Agent': 'Mozilla/5.0'
-                    }
-                }
-            );
+            // Prova prima STON.fi che ha API più affidabili
+            const stonfiTokens = await this.scanSTONfi();
             
-            if (!response.data?.data) {
-                console.log('❌ Nessun dato da GeckoTerminal');
-                return [];
+            if (stonfiTokens.length > 0) {
+                console.log(`✅ Trovati ${stonfiTokens.length} token da STON.fi`);
+                return stonfiTokens;
             }
             
-            const pools = response.data.data;
-            console.log(`📊 GeckoTerminal: ${pools.length} pool trovati`);
+            // Se STON.fi non funziona, prova DeDust
+            console.log('🔄 Tentativo con DeDust...');
+            const dedustTokens = await this.scanDeDust();
             
-            // Debug: mostra struttura completa del primo pool
-            if (pools.length > 0) {
-                console.log('🔍 Struttura pool completa:');
-                const firstPool = pools[0];
-                console.log(JSON.stringify(firstPool, null, 2).substring(0, 1000));
+            if (dedustTokens.length > 0) {
+                console.log(`✅ Trovati ${dedustTokens.length} token da DeDust`);
+                return dedustTokens;
             }
             
-            // Mappa tutti i pool con liquidità sufficiente
-            const mappedTokens = pools
-                .filter(pool => {
-                    const attrs = pool.attributes || {};
-                    const liquidity = parseFloat(attrs.reserve_in_usd || attrs.fdv_usd || 0);
-                    return liquidity > 5000; // Solo pool con almeno $5k
-                })
-                .map(pool => {
-                    const attrs = pool.attributes || {};
-                    
-                    // Estrai informazioni dal nome del pool
-                    const poolName = attrs.name || '';
-                    const tokens = poolName.split('/').map(t => t.trim());
-                    
-                    // Determina quale token non è TON/USDT/USDC
-                    let targetToken = tokens[0];
-                    if (targetToken === 'TON' || targetToken === 'USD₮' || targetToken === 'USDT' || targetToken === 'USDC') {
-                        targetToken = tokens[1] || tokens[0];
-                    }
-                    
-                    return {
-                        address: attrs.address || pool.id,
-                        name: poolName,
-                        symbol: targetToken,
-                        liquidity: parseFloat(attrs.reserve_in_usd || attrs.fdv_usd || 0),
-                        volume24h: parseFloat(attrs.volume_usd?.h24 || 0),
-                        dex: 'STON.fi', // Default a STON.fi per ora
-                        poolAddress: attrs.address || pool.id,
-                        currentPrice: parseFloat(attrs.price_usd || attrs.base_token_price_usd || 0),
-                        tokenAddress: attrs.address || pool.id,
-                        priceChange24h: parseFloat(attrs.price_change_percentage?.h24 || 0)
-                    };
-                })
-                .filter(token => {
-                    // Filtra token validi
-                    return token && 
-                           token.address && 
-                           token.liquidity > 0 &&
-                           token.symbol !== 'TON' &&
-                           token.symbol !== 'USD₮' &&
-                           token.symbol !== 'USDT' &&
-                           token.symbol !== 'USDC';
-                });
-            
-            console.log(`📊 Token mappati: ${mappedTokens.length}`);
-            
-            if (mappedTokens.length > 0) {
-                console.log('🎯 Primi 3 token trovati:');
-                mappedTokens.slice(0, 3).forEach(token => {
-                    console.log(`   ${token.symbol}: Liq=${token.liquidity.toFixed(0)}, Vol=${token.volume24h.toFixed(0)}`);
-                });
-            }
-            
-            return mappedTokens;
+            console.log('❌ Nessun token trovato dai DEX');
+            return [];
             
         } catch (error) {
             console.error('❌ Errore scanning:', error.message);
-            
-            // Fallback: prova con API dirette dei DEX
-            try {
-                return await this.scanDEXsDirect();
-            } catch (fallbackError) {
-                console.error('❌ Anche fallback fallito:', fallbackError.message);
-                return [];
-            }
+            return [];
         }
     }
     
-    async scanDEXsDirect() {
-        console.log('🔄 Tentativo con API dirette dei DEX...');
-        
-        // Per ora ritorna array vuoto
-        // Qui puoi aggiungere il parsing diretto di DeDust/STON.fi quando funzionano
-        return [];
+    async scanSTONfi() {
+        try {
+            console.log('📡 Chiamata API STON.fi...');
+            
+            // API STON.fi per i pool
+            const response = await axios.get('https://api.ston.fi/v1/markets', {
+                timeout: 10000,
+                headers: { 'User-Agent': 'Mozilla/5.0' }
+            });
+            
+            if (!response.data) {
+                console.log('❌ STON.fi: Nessun dato');
+                return [];
+            }
+            
+            // Filtra solo pool con TON
+            const markets = Array.isArray(response.data) ? response.data : [];
+            const tonMarkets = markets.filter(market => 
+                market.quote_asset_address === 'ton' || 
+                market.base_asset_address === 'ton'
+            );
+            
+            console.log(`🔍 STON.fi: ${tonMarkets.length} mercati TON trovati`);
+            
+            // Mappa i mercati in token
+            return tonMarkets
+                .map(market => {
+                    const isTonBase = market.base_asset_address === 'ton';
+                    const tokenAddress = isTonBase ? 
+                        market.quote_asset_address : 
+                        market.base_asset_address;
+                    
+                    const tokenSymbol = isTonBase ? 
+                        market.quote_asset_symbol : 
+                        market.base_asset_symbol;
+                    
+                    const tokenName = isTonBase ? 
+                        market.quote_asset_name : 
+                        market.base_asset_name;
+                    
+                    return {
+                        address: tokenAddress,
+                        name: tokenName || tokenSymbol || 'Unknown',
+                        symbol: tokenSymbol || 'UNK',
+                        liquidity: parseFloat(market.liquidity_usd || 0),
+                        volume24h: parseFloat(market.volume_24h_usd || 0),
+                        dex: 'STON.fi',
+                        poolAddress: market.pool_address,
+                        currentPrice: parseFloat(market.price_usd || 0),
+                        tokenAddress: tokenAddress,
+                        priceChange24h: parseFloat(market.price_change_24h || 0)
+                    };
+                })
+                .filter(token => 
+                    token.address && 
+                    token.address !== 'ton' &&
+                    token.liquidity > 0
+                );
+                
+        } catch (error) {
+            console.log(`❌ Errore STON.fi: ${error.message}`);
+            return [];
+        }
+    }
+    
+    async scanDeDust() {
+        try {
+            console.log('📡 Chiamata API DeDust...');
+            
+            // API DeDust per i pool
+            const response = await axios.get('https://api.dedust.io/v2/pools', {
+                timeout: 10000,
+                headers: { 'User-Agent': 'Mozilla/5.0' }
+            });
+            
+            if (!response.data || !Array.isArray(response.data)) {
+                console.log('❌ DeDust: Nessun dato');
+                return [];
+            }
+            
+            const pools = response.data;
+            
+            // Filtra pool con asset nativo (TON)
+            const tonPools = pools.filter(pool => 
+                pool.assets && 
+                pool.assets.some(asset => asset.type === 'native')
+            );
+            
+            console.log(`🔍 DeDust: ${tonPools.length} pool TON trovati`);
+            
+            // Mappa i pool in token
+            return tonPools
+                .map(pool => {
+                    // Trova quale asset è il token (non TON)
+                    const tokenAsset = pool.assets.find(asset => asset.type !== 'native');
+                    if (!tokenAsset || !tokenAsset.address) return null;
+                    
+                    // Calcola liquidità (TON * 2 * prezzo TON)
+                    const tonAsset = pool.assets.find(asset => asset.type === 'native');
+                    const tonAmount = tonAsset ? parseFloat(tonAsset.amount || 0) / 1e9 : 0;
+                    const liquidityUsd = tonAmount * 2 * 2.76; // Assumendo TON = $2.76
+                    
+                    return {
+                        address: tokenAsset.address,
+                        name: tokenAsset.metadata?.name || 'Unknown',
+                        symbol: tokenAsset.metadata?.symbol || 'UNK',
+                        liquidity: liquidityUsd,
+                        volume24h: parseFloat(pool.stats?.volume_24h || 0),
+                        dex: 'DeDust',
+                        poolAddress: pool.address,
+                        currentPrice: 0,
+                        tokenAddress: tokenAsset.address,
+                        priceChange24h: 0
+                    };
+                })
+                .filter(token => token && token.address && token.liquidity > 0);
+                
+        } catch (error) {
+            console.log(`❌ Errore DeDust: ${error.message}`);
+            return [];
+        }
     }
 
     isValidToken(token) {
