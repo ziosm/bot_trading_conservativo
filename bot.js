@@ -5,7 +5,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const express = require('express');
 
 // =============================================================================
-// EXPRESS SERVER per RENDER con WEBHOOK TELEGRAM v2.3
+// EXPRESS SERVER per RENDER con WEBHOOK TELEGRAM v2.4
 // =============================================================================
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -17,18 +17,18 @@ app.use(express.json());
 let bot = null;
 
 // =============================================================================
-// WEBHOOK TELEGRAM SETUP (identico al v2.2)
+// WEBHOOK TELEGRAM SETUP (identico)
 // =============================================================================
 
 app.use('/webhook', express.json());
 
 app.get('/', (req, res) => {
     res.json({ 
-        status: '🤖 TON Ultra Permissive Bot v2.3 Running',
+        status: '🤖 TON Debug Intensivo Bot v2.4 Running',
         timestamp: new Date().toISOString(),
         uptime: Math.floor(process.uptime()),
-        version: '2.3.0',
-        message: 'Bot Ultra Permissivo + Debug Avanzato',
+        version: '2.4.0',
+        message: 'Bot con Debug Completo per Trovare Problemi',
         webhook_url: `https://${req.get('host')}/webhook/${process.env.TELEGRAM_BOT_TOKEN || 'TOKEN_NOT_SET'}`
     });
 });
@@ -36,7 +36,7 @@ app.get('/', (req, res) => {
 app.get('/health', (req, res) => {
     res.json({ 
         status: 'OK',
-        service: 'TON Ultra Permissive Bot v2.3',
+        service: 'TON Debug Bot v2.4',
         telegram_webhook: process.env.TELEGRAM_BOT_TOKEN ? 'Configured' : 'Not configured',
         timestamp: new Date().toISOString(),
         port: PORT
@@ -68,7 +68,7 @@ app.get('/webhook/info', async (req, res) => {
 app.post('/webhook/test', async (req, res) => {
     try {
         if (bot && bot.telegram) {
-            await bot.notify('🧪 Test webhook v2.3 eseguito con successo!\n✅ Filtri ultra permissivi attivi', 'info');
+            await bot.notify('🧪 Test webhook v2.4 eseguito con successo!\n🔍 Debug intensivo attivo', 'info');
             res.json({ success: true, message: 'Test notification sent via Telegram' });
         } else {
             res.status(500).json({ error: 'Bot not initialized' });
@@ -82,7 +82,7 @@ app.get('/stats', (req, res) => {
     if (bot && bot.stats) {
         res.json({
             status: 'active',
-            version: '2.3.0',
+            version: '2.4.0',
             isRunning: bot.isRunning || false,
             walletAddress: bot.walletAddress || 'Not initialized',
             positions: bot.positions ? bot.positions.size : 0,
@@ -94,12 +94,16 @@ app.get('/stats', (req, res) => {
             telegram_webhook: process.env.TELEGRAM_BOT_TOKEN ? 'Active' : 'Not configured',
             blacklistedTokens: bot.tokenBlacklist ? bot.tokenBlacklist.size : 0,
             candidatesFound: bot.candidatesFound || 0,
-            tokensAnalyzed: bot.tokensAnalyzed || 0
+            tokensAnalyzed: bot.tokensAnalyzed || 0,
+            debugInfo: {
+                filterResults: bot.filterResults || {},
+                lastDebugTime: bot.lastDebugTime || null
+            }
         });
     } else {
         res.json({ 
             status: 'initializing',
-            version: '2.3.0',
+            version: '2.4.0',
             message: 'Bot is starting up...',
             timestamp: new Date().toISOString()
         });
@@ -109,7 +113,7 @@ app.get('/stats', (req, res) => {
 app.get('/bot/start', (req, res) => {
     if (bot && !bot.isRunning) {
         bot.start();
-        res.json({ message: 'Bot v2.3 started via API' });
+        res.json({ message: 'Bot v2.4 started via API' });
     } else if (bot && bot.isRunning) {
         res.json({ message: 'Bot already running' });
     } else {
@@ -120,7 +124,7 @@ app.get('/bot/start', (req, res) => {
 app.get('/bot/stop', (req, res) => {
     if (bot && bot.isRunning) {
         bot.stop();
-        res.json({ message: 'Bot v2.3 stopped via API' });
+        res.json({ message: 'Bot v2.4 stopped via API' });
     } else {
         res.json({ message: 'Bot not running' });
     }
@@ -128,7 +132,7 @@ app.get('/bot/stop', (req, res) => {
 
 // Avvia server Express IMMEDIATAMENTE
 const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🌐 Server v2.3 running on port ${PORT}`);
+    console.log(`🌐 Server v2.4 running on port ${PORT}`);
     console.log(`🔗 Health check: http://localhost:${PORT}/health`);
     console.log(`📊 Stats: http://localhost:${PORT}/stats`);
     console.log(`🔗 Webhook info: http://localhost:${PORT}/webhook/info`);
@@ -136,10 +140,10 @@ const server = app.listen(PORT, '0.0.0.0', () => {
 });
 
 // =============================================================================
-// BOT CLASS v2.3 - ULTRA PERMISSIVO + DEBUG AVANZATO
+// BOT CLASS v2.4 - DEBUG INTENSIVO
 // =============================================================================
 
-class UltraPermissiveTONBot {
+class DebugIntensiveTONBot {
     constructor(config) {
         this.config = config;
         this.client = new TonClient({
@@ -151,9 +155,10 @@ class UltraPermissiveTONBot {
         this.positions = new Map();
         this.scanCount = 0;
         
-        // CONTATORI DEBUG v2.3
+        // CONTATORI DEBUG v2.4
         this.candidatesFound = 0;
         this.tokensAnalyzed = 0;
+        this.lastDebugTime = null;
         this.filterResults = {
             totalScanned: 0,
             passedBasic: 0,
@@ -182,13 +187,13 @@ class UltraPermissiveTONBot {
             lastResetDate: new Date().toDateString()
         };
         
-        // BLACKLIST RIDOTTA (solo gli scam più ovvi)
+        // BLACKLIST RIDOTTA
         this.tokenBlacklist = new Set();
         this.trustedDEXs = new Set(['DeDust', 'STON.fi']);
         this.scamDetections = new Map();
         
-        console.log('🚀 Ultra Permissive TON Bot v2.3 inizializzato');
-        console.log('💡 Focus: Massime opportunità + Debug completo');
+        console.log('🔍 Debug Intensivo TON Bot v2.4 inizializzato');
+        console.log('💡 Focus: Trovare perché non trova token');
         
         this.setupTelegram();
     }
@@ -247,7 +252,7 @@ class UltraPermissiveTONBot {
                 this.setupWebhookEndpoint();
                 
                 setTimeout(async () => {
-                    await this.notify('🎉 Webhook v2.3 configurato!\n🚀 Ultra permissivo attivo\n🔍 Debug avanzato abilitato', 'success');
+                    await this.notify('🎉 Webhook v2.4 configurato!\n🔍 Debug intensivo attivo', 'success');
                 }, 3000);
                 
             } else {
@@ -323,7 +328,7 @@ class UltraPermissiveTONBot {
             console.log('✅ Polling fallback configurato');
             
             setTimeout(async () => {
-                await this.notify('📱 Telegram v2.3 configurato con polling fallback\n🚀 Ultra permissivo attivo', 'info');
+                await this.notify('📱 Telegram v2.4 configurato con polling fallback\n🔍 Debug intensivo attivo', 'info');
             }, 3000);
             
         } catch (error) {
@@ -360,6 +365,9 @@ class UltraPermissiveTONBot {
                 case '/debug':
                     await this.sendDebugInfo(chatId);
                     break;
+                case '/intensive':
+                    await this.sendIntensiveDebug(chatId);
+                    break;
                 case '/filters':
                     await this.sendFilterResults(chatId);
                     break;
@@ -382,7 +390,7 @@ class UltraPermissiveTONBot {
                     await this.sendHelpMessage(chatId);
                     break;
                 case '/test':
-                    await this.telegram.sendMessage(chatId, '✅ Bot v2.3 risponde correttamente!\n🔗 Webhook funzionante!\n🚀 Ultra permissivo attivo');
+                    await this.telegram.sendMessage(chatId, '✅ Bot v2.4 risponde correttamente!\n🔗 Webhook funzionante!\n🔍 Debug intensivo attivo');
                     break;
                 case '/webhook':
                     await this.sendWebhookInfo(chatId);
@@ -392,6 +400,9 @@ class UltraPermissiveTONBot {
                     break;
                 case '/scan':
                     await this.manualScan(chatId);
+                    break;
+                case '/api':
+                    await this.testAPIs(chatId);
                     break;
                 default:
                     if (text.startsWith('/')) {
@@ -409,26 +420,30 @@ class UltraPermissiveTONBot {
         }
     }
 
+    // =============================================================================
+    // COMANDI TELEGRAM v2.4
+    // =============================================================================
+
     async handleStartCommand(chatId) {
         if (!this.isRunning) {
             await this.start();
-            await this.telegram.sendMessage(chatId, '🚀 Bot v2.3 avviato!\n🔧 Filtri ultra permissivi attivi\nUsa /debug per monitorare.');
+            await this.telegram.sendMessage(chatId, '🚀 Bot v2.4 avviato!\n🔍 Debug intensivo attivo\nUsa /intensive per debug completo.');
         } else {
-            await this.telegram.sendMessage(chatId, '⚠️ Bot già in esecuzione\nUsa /debug per dettagli.');
+            await this.telegram.sendMessage(chatId, '⚠️ Bot già in esecuzione\nUsa /intensive per debug.');
         }
     }
 
     async handleStopCommand(chatId) {
         if (this.isRunning) {
             this.stop();
-            await this.telegram.sendMessage(chatId, '🛑 Bot v2.3 fermato\nUsa /start per riavviare.');
+            await this.telegram.sendMessage(chatId, '🛑 Bot v2.4 fermato\nUsa /start per riavviare.');
         } else {
             await this.telegram.sendMessage(chatId, '⚠️ Bot già fermato\nUsa /start per avviare.');
         }
     }
 
     async handleRestartCommand(chatId) {
-        await this.telegram.sendMessage(chatId, '🔄 Riavvio bot v2.3 in corso...');
+        await this.telegram.sendMessage(chatId, '🔄 Riavvio bot v2.4 in corso...');
         
         if (this.isRunning) {
             this.stop();
@@ -436,12 +451,12 @@ class UltraPermissiveTONBot {
         }
         
         await this.start();
-        await this.telegram.sendMessage(chatId, '✅ Bot v2.3 riavviato con successo!\n🚀 Ultra permissivo attivo');
+        await this.telegram.sendMessage(chatId, '✅ Bot v2.4 riavviato con successo!\n🔍 Debug intensivo attivo');
     }
 
     async sendDebugInfo(chatId) {
         const message = `
-🔍 *DEBUG INFO v2.3*
+🔍 *DEBUG INFO v2.4*
 
 📊 *Contatori Scansione:*
 • Scansioni totali: ${this.scanCount}
@@ -461,17 +476,130 @@ class UltraPermissiveTONBot {
 • Candidati/Scansioni: ${this.scanCount > 0 ? ((this.candidatesFound / this.scanCount) * 100).toFixed(2) : 0}%
 • Approvati/Candidati: ${this.candidatesFound > 0 ? ((this.filterResults.approved / this.candidatesFound) * 100).toFixed(2) : 0}%
 
-💡 Usa /filters per dettagli sui filtri
+💡 Usa /intensive per debug completo API
+💡 Usa /api per testare solo le API
         `.trim();
         
         await this.telegram.sendMessage(chatId, message, { parse_mode: 'Markdown' });
     }
 
+    async sendIntensiveDebug(chatId) {
+        await this.telegram.sendMessage(chatId, '🔍 Avvio debug intensivo completo...');
+        this.lastDebugTime = new Date().toISOString();
+        
+        try {
+            console.log('\n🚀 DEBUG INTENSIVO v2.4 - ANALISI COMPLETA API');
+            
+            // Test DeDust
+            console.log('\n📡 TESTING DeDust API...');
+            const dedustTokens = await this.scanDeDustDebugIntensive();
+            
+            // Test STON.fi
+            console.log('\n📡 TESTING STON.fi API...');
+            const stonfiTokens = await this.scanSTONfiDebugIntensive();
+            
+            const allTokens = [...dedustTokens, ...stonfiTokens];
+            
+            let message = `🔍 *DEBUG INTENSIVO v2.4*\n\n`;
+            message += `📊 *Risultati API:*\n`;
+            message += `• DeDust: ${dedustTokens.length} token candidati\n`;
+            message += `• STON.fi: ${stonfiTokens.length} token candidati\n`;
+            message += `• Totale: ${allTokens.length} token candidati\n\n`;
+            
+            if (allTokens.length > 0) {
+                message += `🎯 *Token Candidati:*\n`;
+                for (let i = 0; i < Math.min(allTokens.length, 10); i++) {
+                    const token = allTokens[i];
+                    const age = token.createdAt ? Math.floor((Date.now() - token.createdAt) / (1000 * 60 * 60)) : 'N/A';
+                    message += `${i + 1}. ${token.symbol} - $${token.liquidity} (${age}h) - ${token.dex}\n`;
+                }
+                
+                if (allTokens.length > 10) {
+                    message += `... e altri ${allTokens.length - 10} token\n`;
+                }
+                
+                message += `\n🔧 Ora testo i filtri su questi token...`;
+                await this.telegram.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+                
+                // Test filtri sui primi 3 token
+                for (let i = 0; i < Math.min(3, allTokens.length); i++) {
+                    const token = allTokens[i];
+                    console.log(`\n🔬 TESTING FILTRI su ${token.symbol}...`);
+                    const passed = this.passesFiltersDebugIntensive(token);
+                    
+                    await this.telegram.sendMessage(chatId, 
+                        `🔬 *Test ${token.symbol}*\n` +
+                        `Liquidità: $${token.liquidity}\n` +
+                        `Età: ${token.createdAt ? Math.floor((Date.now() - token.createdAt) / (1000 * 60 * 60)) : 'N/A'} ore\n` +
+                        `Risultato: ${passed ? '✅ APPROVATO' : '❌ RIFIUTATO'}\n` +
+                        `Dettagli nei logs...`, 
+                        { parse_mode: 'Markdown' }
+                    );
+                }
+                
+            } else {
+                message += `❌ *Nessun token trovato dalle API!*\n\n`;
+                message += `🔧 *Possibili problemi:*\n`;
+                message += `• API non rispondono correttamente\n`;
+                message += `• Tutti i pool non hanno TON\n`;
+                message += `• Liquidità troppo bassa su tutti\n`;
+                message += `• Formato risposta API cambiato\n\n`;
+                message += `💡 Controlla i logs per dettagli completi`;
+            }
+            
+            await this.telegram.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+            
+        } catch (error) {
+            await this.telegram.sendMessage(chatId, `❌ Errore debug intensivo: ${error.message}`);
+        }
+    }
+
+    async testAPIs(chatId) {
+        await this.telegram.sendMessage(chatId, '🔧 Testing solo API...');
+        
+        try {
+            // Test DeDust
+            const dedustResponse = await axios.get('https://api.dedust.io/v2/pools', {
+                timeout: 10000,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (TON-Bot/2.4)',
+                    'Accept': 'application/json'
+                }
+            });
+            
+            // Test STON.fi
+            const stonfiResponse = await axios.get('https://api.ston.fi/v1/pools', {
+                timeout: 8000,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (TON-Bot/2.4)'
+                }
+            });
+            
+            let message = `🔧 *TEST API v2.4*\n\n`;
+            message += `📡 *DeDust API:*\n`;
+            message += `• Status: ${dedustResponse.status}\n`;
+            message += `• Pool totali: ${dedustResponse.data ? dedustResponse.data.length : 'N/A'}\n`;
+            message += `• Tipo risposta: ${Array.isArray(dedustResponse.data) ? 'Array' : typeof dedustResponse.data}\n\n`;
+            
+            message += `📡 *STON.fi API:*\n`;
+            message += `• Status: ${stonfiResponse.status}\n`;
+            message += `• Pool totali: ${stonfiResponse.data?.pool_list ? stonfiResponse.data.pool_list.length : 'N/A'}\n`;
+            message += `• Ha pool_list: ${!!stonfiResponse.data?.pool_list}\n\n`;
+            
+            message += `✅ Entrambe le API rispondono correttamente`;
+            
+            await this.telegram.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+            
+        } catch (error) {
+            await this.telegram.sendMessage(chatId, `❌ Errore test API: ${error.message}`);
+        }
+    }
+
     async sendFilterResults(chatId) {
-        const config = this.config.ultraPermissive;
+        const config = this.config.debugIntensive;
         
         const message = `
-🔧 *CONFIGURAZIONE FILTRI v2.3*
+🔧 *CONFIGURAZIONE FILTRI v2.4*
 
 ⚙️ *Impostazioni Correnti:*
 • Min Confidence: ${config.minConfidenceScore}%
@@ -481,14 +609,17 @@ class UltraPermissiveTONBot {
 • Max Trade: ${config.maxTradeSize} TON
 
 📊 *Performance Filtri:*
-• Basic filters pass rate: ${this.filterResults.totalScanned > 0 ? ((this.filterResults.passedBasic / this.filterResults.totalScanned) * 100).toFixed(1) : 0}%
-• Scam detection rate: ${this.filterResults.totalScanned > 0 ? ((this.filterResults.failedScam / this.filterResults.totalScanned) * 100).toFixed(1) : 0}%
-• Liquidity filter rate: ${this.filterResults.totalScanned > 0 ? ((this.filterResults.failedLiquidity / this.filterResults.totalScanned) * 100).toFixed(1) : 0}%
+• Total scanned: ${this.filterResults.totalScanned}
+• Basic pass rate: ${this.filterResults.totalScanned > 0 ? ((this.filterResults.passedBasic / this.filterResults.totalScanned) * 100).toFixed(1) : 0}%
+• Scam detection: ${this.filterResults.failedScam}
+• Failed liquidity: ${this.filterResults.failedLiquidity}
+• Failed age: ${this.filterResults.failedAge}
+• Failed keywords: ${this.filterResults.failedKeywords}
 
-🎯 *Keywords Monitorate:*
+🎯 *Keywords (prime 15):*
 ${config.strongKeywords.slice(0, 15).join(', ')}... (+${config.strongKeywords.length - 15} altre)
 
-💡 Usa /scan per forzare scansione manuale
+💡 Usa /intensive per test completo
         `.trim();
         
         await this.telegram.sendMessage(chatId, message, { parse_mode: 'Markdown' });
@@ -498,16 +629,17 @@ ${config.strongKeywords.slice(0, 15).join(', ')}... (+${config.strongKeywords.le
         await this.telegram.sendMessage(chatId, '🔍 Avvio scansione manuale...');
         
         try {
-            const qualityTokens = await this.findQualityTokens();
+            const qualityTokens = await this.findQualityTokensDebug();
             
-            let message = `🔍 *SCANSIONE MANUALE v2.3*\n\n`;
+            let message = `🔍 *SCANSIONE MANUALE v2.4*\n\n`;
             message += `📊 Candidati trovati: ${qualityTokens.length}\n\n`;
             
             if (qualityTokens.length > 0) {
                 message += `🎯 *Token Candidati:*\n`;
                 for (let i = 0; i < Math.min(qualityTokens.length, 5); i++) {
                     const token = qualityTokens[i];
-                    message += `• ${token.symbol} - $${token.liquidity} (${token.dex})\n`;
+                    const age = token.createdAt ? Math.floor((Date.now() - token.createdAt) / (1000 * 60 * 60)) : 'N/A';
+                    message += `• ${token.symbol} - $${token.liquidity} (${age}h) - ${token.dex}\n`;
                 }
                 
                 if (qualityTokens.length > 5) {
@@ -515,7 +647,7 @@ ${config.strongKeywords.slice(0, 15).join(', ')}... (+${config.strongKeywords.le
                 }
             } else {
                 message += `❌ Nessun token trovato\n`;
-                message += `💡 Prova ad abbassare i filtri`;
+                message += `💡 Usa /intensive per debug completo`;
             }
             
             await this.telegram.sendMessage(chatId, message, { parse_mode: 'Markdown' });
@@ -531,19 +663,20 @@ ${config.strongKeywords.slice(0, 15).join(', ')}... (+${config.strongKeywords.le
             const canTrade = await this.canContinueTrading();
             
             const message = `
-🔍 *BALANCE DEBUG v2.3*
+🔍 *BALANCE DEBUG v2.4*
 
 💰 *Balance Attuale:* ${currentBalance.toFixed(4)} TON
 💰 *Start Balance:* ${this.stats.startBalance.toFixed(4)} TON
-⚙️ *Minimo Richiesto:* ${this.config.ultraPermissive.minStartBalance} TON
+⚙️ *Minimo Richiesto:* ${this.config.debugIntensive.minStartBalance} TON
 
 📊 *Altri Limiti:*
-• Daily P&L: ${this.stats.dailyPnL.toFixed(4)} TON (max loss: -${this.config.ultraPermissive.maxDailyLoss})
-• Posizioni: ${this.positions.size}/${this.config.ultraPermissive.maxPositions}
+• Daily P&L: ${this.stats.dailyPnL.toFixed(4)} TON (max loss: -${this.config.debugIntensive.maxDailyLoss})
+• Posizioni: ${this.positions.size}/${this.config.debugIntensive.maxPositions}
 
 🎯 *Trading Status:* ${canTrade ? '✅ ATTIVO' : '❌ SOSPESO'}
-🚀 *Token Analizzati:* ${this.tokensAnalyzed}
-🔍 *Candidati Totali:* ${this.candidatesFound}
+🔍 *Token Analizzati:* ${this.tokensAnalyzed}
+🎯 *Candidati Totali:* ${this.candidatesFound}
+🕐 *Last Debug:* ${this.lastDebugTime || 'Mai'}
 
 ${!canTrade ? '💡 Motivo sospensione controllato nei logs' : ''}
             `.trim();
@@ -557,7 +690,7 @@ ${!canTrade ? '💡 Motivo sospensione controllato nei logs' : ''}
 
     async sendBlacklistInfo(chatId) {
         const message = `
-🛡️ *BLACKLIST ULTRA RIDOTTA v2.3*
+🛡️ *BLACKLIST DEBUG v2.4*
 
 📊 *Token Blacklistati:* ${this.tokenBlacklist.size}
 🔍 *Scansioni Totali:* ${this.scanCount}
@@ -569,8 +702,7 @@ ${!canTrade ? '💡 Motivo sospensione controllato nei logs' : ''}
 • Liquidità zero o negativa
 • Imitazioni perfette di coin famosi
 
-💡 v2.3 blocca solo i token CHIARAMENTE pericolosi
-🚀 Tutti gli altri vengono testati per trading
+💡 v2.4 blocca MOLTO poco per massimizzare opportunità
         `.trim();
         
         await this.telegram.sendMessage(chatId, message, { parse_mode: 'Markdown' });
@@ -581,7 +713,7 @@ ${!canTrade ? '💡 Motivo sospensione controllato nei logs' : ''}
             const info = await this.telegram.getWebHookInfo();
             
             const message = `
-🔗 *WEBHOOK INFO v2.3*
+🔗 *WEBHOOK INFO v2.4*
 
 📡 *Status:* ${this.webhookConfigured ? '✅ Configurato' : '❌ Non configurato'}
 🌐 *URL:* ${info.url || 'Nessuno'}
@@ -606,7 +738,7 @@ ${!canTrade ? '💡 Motivo sospensione controllato nei logs' : ''}
         const balance = await this.getWalletBalance();
         
         const message = `
-🤖 *TON Ultra Permissive Bot v2.3 Status*
+🤖 *TON Debug Bot v2.4 Status*
 
 ${status} | ⏱️ Uptime: ${uptime}
 🌐 Deploy: Render Cloud
@@ -620,7 +752,7 @@ ${status} | ⏱️ Uptime: ${uptime}
 📊 Total P&L: ${this.stats.totalPnL.toFixed(4)} TON
 🎯 Win Rate: ${this.getWinRate()}%
 
-📱 *Comandi debug:* /debug, /filters, /scan
+📱 *Comandi debug:* /intensive, /api, /scan
         `.trim();
         
         await this.telegram.sendMessage(chatId, message, { parse_mode: 'Markdown' });
@@ -630,7 +762,7 @@ ${status} | ⏱️ Uptime: ${uptime}
         const balance = await this.getWalletBalance();
         
         const message = `
-📊 *Statistiche Dettagliate v2.3*
+📊 *Statistiche Dettagliate v2.4*
 
 💰 *Wallet:*
 Address: \`${this.walletAddress || 'Non inizializzato'}\`
@@ -646,11 +778,12 @@ Win Rate: ${this.getWinRate()}%
 Daily P&L: ${this.stats.dailyPnL.toFixed(4)} TON
 Total P&L: ${this.stats.totalPnL.toFixed(4)} TON
 
-🔍 *Scansioni v2.3:*
+🔍 *Debug v2.4:*
 Scansioni totali: ${this.scanCount}
 Token analizzati: ${this.tokensAnalyzed}
 Candidati trovati: ${this.candidatesFound}
 Approvati per trading: ${this.filterResults.approved}
+Last debug: ${this.lastDebugTime || 'Mai'}
 
 ⏰ *Sistema:*
 Webhook: ${this.webhookConfigured ? '✅ Configurato' : '📱 Polling fallback'}
@@ -662,7 +795,7 @@ Ultimo reset: ${this.stats.lastResetDate}
 
     async sendPositions(chatId) {
         if (this.positions.size === 0) {
-            await this.telegram.sendMessage(chatId, '📭 Nessuna posizione aperta\n\n💡 Il bot cerca automaticamente opportunità ogni 20 secondi\n🚀 Filtri ultra permissivi attivi\n\nUsa /debug per vedere perché non trova token');
+            await this.telegram.sendMessage(chatId, '📭 Nessuna posizione aperta\n\n💡 Il bot cerca automaticamente opportunità ogni 30 secondi\n🔍 Debug intensivo attivo\n\nUsa /intensive per vedere perché non trova token');
             return;
         }
         
@@ -689,7 +822,7 @@ Ultimo reset: ${this.stats.lastResetDate}
         const balance = await this.getWalletBalance();
         
         const message = `
-💳 *WALLET INFO v2.3*
+💳 *WALLET INFO v2.4*
 
 📍 *Indirizzo:*
 \`${this.walletAddress || 'Non inizializzato'}\`
@@ -700,17 +833,17 @@ ${balance.toFixed(4)} TON
 🔗 *Explorer:*
 [Visualizza su TONScan](https://tonscan.org/address/${this.walletAddress})
 
-⚙️ *Configurazione Ultra Permissiva v2.3:*
-• Max Trade: ${this.config.ultraPermissive.maxTradeSize} TON
-• Balance minimo: ${this.config.ultraPermissive.minStartBalance} TON
-• Confidence minimo: ${this.config.ultraPermissive.minConfidenceScore}% (MOLTO BASSO!)
-• Liquidità minima: $${this.config.ultraPermissive.minLiquidity} (MOLTO BASSA!)
-• Status: ${balance >= this.config.ultraPermissive.minStartBalance ? '✅ OK per trading' : '⚠️ Balance insufficiente'}
+⚙️ *Configurazione Debug v2.4:*
+• Max Trade: ${this.config.debugIntensive.maxTradeSize} TON
+• Balance minimo: ${this.config.debugIntensive.minStartBalance} TON
+• Confidence minimo: ${this.config.debugIntensive.minConfidenceScore}%
+• Liquidità minima: $${this.config.debugIntensive.minLiquidity}
+• Status: ${balance >= this.config.debugIntensive.minStartBalance ? '✅ OK per trading' : '⚠️ Balance insufficiente'}
 
 💡 *Keywords monitorate:*
-${this.config.ultraPermissive.strongKeywords.slice(0, 10).join(', ')}... (+${this.config.ultraPermissive.strongKeywords.length - 10} altre)
+${this.config.debugIntensive.strongKeywords.slice(0, 10).join(', ')}... (+${this.config.debugIntensive.strongKeywords.length - 10} altre)
 
-🚀 *Ultra Permissivo:* Testa quasi tutto!
+🔍 *Debug Intensivo:* Massima visibilità sui problemi!
         `.trim();
         
         await this.telegram.sendMessage(chatId, message, { parse_mode: 'Markdown' });
@@ -718,12 +851,14 @@ ${this.config.ultraPermissive.strongKeywords.slice(0, 10).join(', ')}... (+${thi
 
     async sendHelpMessage(chatId) {
         const message = `
-🤖 *TON Ultra Permissive Bot v2.3 Commands*
+🤖 *TON Debug Bot v2.4 Commands*
 
 📊 *Status & Info:*
 /status - Status generale del bot
 /stats - Statistiche dettagliate trading
 /debug - Debug info con contatori
+/intensive - 🔥 Debug completo API + filtri
+/api - Test rapido solo API
 /filters - Info sui filtri e performance
 /positions - Posizioni aperte
 /wallet - Info wallet e balance
@@ -737,36 +872,36 @@ ${this.config.ultraPermissive.strongKeywords.slice(0, 10).join(', ')}... (+${thi
 
 🔧 *Sistema:*
 /webhook - Info webhook Telegram
-/blacklist - Info protezione (ridotta)
+/blacklist - Info protezione (minimale)
 /test - Test connessione
 /help - Questo messaggio
 
 🔔 *Notifiche Automatiche:*
 • Debug continuo delle scansioni
 • Token trovati ma non approvati
-• Ogni trade con dettagli completi
-• Alert solo per errori gravi
+• Dettagli completi di ogni step
+• Solo alert per errori gravi
 
-📊 *Filtri Ultra Permissivi v2.3:*
-• Confidence minimo: ${this.config.ultraPermissive.minConfidenceScore}% (MOLTO BASSO!)
-• Liquidità minima: $${this.config.ultraPermissive.minLiquidity} (MOLTO BASSA!)
-• Scansione ogni: ${this.config.ultraPermissive.scanInterval / 1000}s
-• Max trade: ${this.config.ultraPermissive.maxTradeSize} TON
+📊 *Filtri Debug v2.4:*
+• Confidence minimo: ${this.config.debugIntensive.minConfidenceScore}%
+• Liquidità minima: $${this.config.debugIntensive.minLiquidity}
+• Scansione ogni: ${this.config.debugIntensive.scanInterval / 1000}s
+• Max trade: ${this.config.debugIntensive.maxTradeSize} TON
 
-🚀 *Ultra Permissivo:*
-✅ Blocca solo scam ovvi e pericolosi
-✅ Testa token con liquidità minima
-✅ Keywords estese per più opportunità
-✅ Age range ampissimo
-✅ Confidence threshold molto basso
-✅ Debug completo di ogni scansione
+🔍 *Debug Features:*
+✅ API response completa visibile
+✅ Ogni filtro testato step-by-step
+✅ Età token mostrata in ore/giorni
+✅ Keywords match dettagliate
+✅ Motivi rifiuto specifici
+✅ Test manuale singoli token
 
-🌐 *Bot v2.3 Features:*
-🚀 Massime opportunità possibili
-🔍 Debug avanzato e trasparente
-🛡️ Protezione solo anti-scam critica
-⚡ Scansioni rapide (20s)
+🌐 *Bot v2.4 Features:*
+🔍 Debug totale e trasparente
 📊 Statistiche dettagliate in tempo reale
+🔧 Test API separati
+⚡ Scansioni ottimizzate
+🛡️ Protezione minimale per max opportunità
         `.trim();
         
         await this.telegram.sendMessage(chatId, message, { parse_mode: 'Markdown' });
@@ -810,7 +945,7 @@ ${this.config.ultraPermissive.strongKeywords.slice(0, 10).join(', ')}... (+${thi
     }
 
     // =============================================================================
-    // WALLET INITIALIZATION (identico al v2.2)
+    // WALLET INITIALIZATION (identico)
     // =============================================================================
 
     async debugWalletAddresses(mnemonic) {
@@ -845,7 +980,7 @@ ${this.config.ultraPermissive.strongKeywords.slice(0, 10).join(', ')}... (+${thi
 
     async initialize() {
         try {
-            console.log('🔑 Inizializzazione wallet v2.3...');
+            console.log('🔑 Inizializzazione wallet v2.4...');
             
             const mnemonicString = process.env.MNEMONIC_WORDS;
             
@@ -885,13 +1020,13 @@ ${this.config.ultraPermissive.strongKeywords.slice(0, 10).join(', ')}... (+${thi
             console.log(`💰 Balance: ${this.stats.startBalance.toFixed(4)} TON`);
             
             await this.notify(`
-🏦 *Wallet Inizializzato v2.3*
+🏦 *Wallet Inizializzato v2.4*
 Address: \`${this.walletAddress}\`
 Balance: ${this.stats.startBalance.toFixed(4)} TON
-Status: ${this.stats.startBalance >= this.config.ultraPermissive.minStartBalance ? '✅ Pronto' : '⚠️ Balance basso'}
+Status: ${this.stats.startBalance >= this.config.debugIntensive.minStartBalance ? '✅ Pronto' : '⚠️ Balance basso'}
 Match: ${debugResult.isMatch ? '✅ Corretto' : '❌ Verifica mnemonic'}
 Webhook: ${this.webhookConfigured ? '✅ Attivo' : '📱 Fallback'}
-🚀 Ultra Permissivo: ✅ Attivo
+🔍 Debug Intensivo: ✅ Attivo
             `, 'success');
             
             return true;
@@ -903,7 +1038,7 @@ Webhook: ${this.webhookConfigured ? '✅ Attivo' : '📱 Fallback'}
     }
 
     async start() {
-        console.log('🚀 Ultra Permissive Bot v2.3 avviato...');
+        console.log('🚀 Debug Intensivo Bot v2.4 avviato...');
         
         if (!await this.initialize()) {
             console.error('❌ Impossibile inizializzare il bot');
@@ -914,59 +1049,56 @@ Webhook: ${this.webhookConfigured ? '✅ Attivo' : '📱 Fallback'}
         this.startTime = Date.now();
         
         await this.notify(`
-🚀 *Bot v2.3 Ultra Permissivo Avviato*
+🚀 *Bot v2.4 Debug Intensivo Avviato*
 
 💳 Wallet: \`${this.walletAddress}\`
 🔗 Webhook: ${this.webhookConfigured ? '✅ Funzionante' : '📱 Polling fallback'}
 
-📊 *Filtri Ultra Permissivi:*
-• Confidence: ${this.config.ultraPermissive.minConfidenceScore}% (ERA 45%!)
-• Liquidità: $${this.config.ultraPermissive.minLiquidity} (ERA $25!)
-• Scansione: ${this.config.ultraPermissive.scanInterval / 1000}s (ERA 30s!)
-• Age range: ${(this.config.ultraPermissive.minTokenAge/1000/60).toFixed(0)}min-${(this.config.ultraPermissive.maxTokenAge/1000/60/60/24).toFixed(0)}gg
+📊 *Configurazione Debug:*
+• Confidence: ${this.config.debugIntensive.minConfidenceScore}%
+• Liquidità: $${this.config.debugIntensive.minLiquidity}
+• Scansione: ${this.config.debugIntensive.scanInterval / 1000}s
+• Age range: ${(this.config.debugIntensive.minTokenAge/1000/60).toFixed(0)}min-${(this.config.debugIntensive.maxTokenAge/1000/60/60/24).toFixed(0)}gg
 
-🚀 *Ultra Permissivo significa:*
-• Prova TUTTO quello che non è chiaramente scam
-• Liquidità minima ridicola ($5!)
-• Confidence minimo bassissimo (25%!)
-• Keywords ampliate al massimo
+🔍 *Debug Intensivo significa:*
+• Ogni step della scansione è visibile
+• Mostra perché i token vengono rifiutati
+• Test API separati disponibili
+• Filtri ottimizzati per trovare problemi
 
-🔍 Usa /debug per monitorare in tempo reale
-💡 Usa /scan per scansione manuale
+🔧 Usa /intensive per debug completo
+💡 Usa /api per testare solo le API
         `, 'startup');
         
-        // Avvia monitoraggio ultra permissivo
-        this.ultraPermissiveMonitoring();
+        // Avvia monitoraggio con debug
+        this.debugMonitoring();
         this.dailyStatsReset();
         this.emergencyChecks();
         this.scheduleDailyReport();
     }
 
     // =============================================================================
-    // TRADING ENGINE v2.3 - ULTRA PERMISSIVO
+    // TRADING ENGINE v2.4 - CON DEBUG INTENSIVO
     // =============================================================================
 
     async canContinueTrading() {
-        const config = this.config.ultraPermissive;
+        const config = this.config.debugIntensive;
         
-        // 1. CHECK BALANCE MINIMO - RIDOTTO AL MINIMO
         const currentBalance = await this.getWalletBalance();
         if (currentBalance < config.minStartBalance) {
             console.log(`❌ Balance insufficiente: ${currentBalance.toFixed(4)} TON < ${config.minStartBalance} TON`);
             
-            if (this.scanCount % 20 === 0) { // Notifica meno frequente
+            if (this.scanCount % 20 === 0) {
                 await this.notify(`💰 Balance insufficiente per trading\nBalance attuale: ${currentBalance.toFixed(4)} TON\nMinimo richiesto: ${config.minStartBalance} TON`, 'warning', true);
             }
             return false;
         }
         
-        // 2. CHECK PERDITA GIORNALIERA
         if (this.stats.dailyPnL <= -config.maxDailyLoss) {
             console.log(`❌ Perdita giornaliera eccessiva: ${this.stats.dailyPnL.toFixed(4)} TON <= -${config.maxDailyLoss} TON`);
             return false;
         }
         
-        // 3. CHECK NUMERO MASSIMO POSIZIONI - AUMENTATO
         if (this.positions.size >= config.maxPositions) {
             console.log(`❌ Troppe posizioni aperte: ${this.positions.size} >= ${config.maxPositions}`);
             return false;
@@ -976,8 +1108,8 @@ Webhook: ${this.webhookConfigured ? '✅ Attivo' : '📱 Fallback'}
         return true;
     }
 
-    async ultraPermissiveMonitoring() {
-        const scanInterval = this.config.ultraPermissive.scanInterval || 20000; // 20 secondi
+    async debugMonitoring() {
+        const scanInterval = this.config.debugIntensive.scanInterval || 30000;
         
         while (this.isRunning) {
             try {
@@ -990,28 +1122,21 @@ Webhook: ${this.webhookConfigured ? '✅ Attivo' : '📱 Fallback'}
                 }
                 
                 this.scanCount++;
-                console.log(`\n🔍 Ultra Permissive Scan #${this.scanCount} - ${new Date().toLocaleTimeString()} (v2.3)`);
+                console.log(`\n🔍 Debug Scan #${this.scanCount} - ${new Date().toLocaleTimeString()} (v2.4)`);
                 
-                // DEBUG: Reset contatori per questa scansione
-                const scanStartTime = Date.now();
-                let scanTokensFound = 0;
-                
-                // Trova token con filtri minimi
-                const qualityTokens = await this.findQualityTokensUltraPermissive();
-                scanTokensFound = qualityTokens.length;
-                this.candidatesFound += scanTokensFound;
+                const qualityTokens = await this.findQualityTokensDebug();
+                this.candidatesFound += qualityTokens.length;
                 
                 if (qualityTokens.length > 0) {
-                    console.log(`   🚀 Trovati ${qualityTokens.length} token candidati (ultra permissivo v2.3)`);
+                    console.log(`   🎯 Trovati ${qualityTokens.length} token candidati (debug v2.4)`);
                     
-                    // Invia notifica debug ogni 10 scansioni
-                    if (this.scanCount % 10 === 0) {
+                    // Notifica debug ogni 5 scansioni con risultati
+                    if (this.scanCount % 5 === 0) {
                         await this.notify(`
 🔍 *Debug Scan #${this.scanCount}*
-🎯 Candidati: ${scanTokensFound}
-⏱️ Tempo: ${Date.now() - scanStartTime}ms
+🎯 Candidati: ${qualityTokens.length}
 📊 Total trovati: ${this.candidatesFound}
-🚀 Success rate: ${((this.candidatesFound / this.scanCount) * 100).toFixed(1)}%
+📈 Success rate: ${((this.candidatesFound / this.scanCount) * 100).toFixed(1)}%
                         `, 'debug', true);
                     }
                     
@@ -1019,32 +1144,31 @@ Webhook: ${this.webhookConfigured ? '✅ Attivo' : '📱 Fallback'}
                         const stillCanTrade = await this.canContinueTrading();
                         if (!stillCanTrade) break;
                         
-                        const analysis = await this.ultraPermissiveTokenAnalysis(token);
+                        const analysis = await this.debugTokenAnalysis(token);
                         if (analysis.shouldBuy) {
-                            await this.ultraPermissiveBuy(token, analysis);
+                            await this.debugBuy(token, analysis);
                         } else {
                             console.log(`   📋 ${token.symbol}: ${analysis.rejectionReason}`);
                         }
                         
-                        await this.sleep(3000); // Pausa ridotta
+                        await this.sleep(3000);
                     }
                 } else {
-                    console.log('   💤 Nessun token candidato trovato (filtri ultra minimi)');
+                    console.log('   💤 Nessun token candidato trovato (debug attivo)');
                     
-                    // DEBUG ogni 20 scansioni senza risultati
-                    if (this.scanCount % 20 === 0) {
+                    // Debug ogni 10 scansioni senza risultati
+                    if (this.scanCount % 10 === 0) {
                         await this.notify(`
-🔍 *Debug: Nessun Token Trovato*
-Scan #${this.scanCount}: 0 candidati
-📊 Total rate: ${((this.candidatesFound / this.scanCount) * 100).toFixed(1)}%
+🔍 *Debug: Scan #${this.scanCount} - 0 candidati*
+📊 Success rate totale: ${((this.candidatesFound / this.scanCount) * 100).toFixed(1)}%
 
 🧐 Possibili cause:
-• API DEX non risponde
-• Tutti token in blacklist
-• Filtri età troppo stretti
-• Liquidità DEX bassa
+• API non rispondono
+• Tutti token troppo vecchi/nuovi
+• Liquidità troppo bassa
+• Nessuna keyword match
 
-💡 Usa /scan per test manuale
+💡 Usa /intensive per diagnosi completa
                         `, 'debug', true);
                     }
                 }
@@ -1060,18 +1184,19 @@ Scan #${this.scanCount}: 0 candidati
         }
     }
 
-    async findQualityTokensUltraPermissive() {
+    async findQualityTokensDebug() {
         const qualityTokens = [];
         
         try {
             for (const dex of this.trustedDEXs) {
-                const tokens = await this.scanDEXUltraPermissive(dex);
+                console.log(`🔍 Scansione ${dex}...`);
+                const tokens = await this.scanDEXDebug(dex);
                 qualityTokens.push(...tokens);
                 this.tokensAnalyzed += tokens.length;
+                console.log(`   📊 ${dex}: ${tokens.length} token candidati trovati`);
             }
             
-            // Filtri minimi
-            const filtered = qualityTokens.filter(token => this.passesUltraPermissiveFilters(token));
+            const filtered = qualityTokens.filter(token => this.passesFiltersDebug(token));
             
             return filtered;
             
@@ -1081,15 +1206,13 @@ Scan #${this.scanCount}: 0 candidati
         }
     }
 
-    async scanDEXUltraPermissive(dex) {
+    async scanDEXDebug(dex) {
         try {
-            console.log(`🔍 Scansione ${dex}...`);
-            
             switch (dex) {
                 case 'DeDust':
-                    return await this.scanDeDustUltraPermissive();
+                    return await this.scanDeDustDebug();
                 case 'STON.fi':
-                    return await this.scanSTONfiUltraPermissive();
+                    return await this.scanSTONfiDebug();
                 default:
                     return [];
             }
@@ -1099,28 +1222,26 @@ Scan #${this.scanCount}: 0 candidati
         }
     }
 
-    async scanDeDustUltraPermissive() {
+    // =============================================================================
+    // SCAN DEBUG METHODS - CON MASSIMO DEBUG
+    // =============================================================================
+
+    async scanDeDustDebug() {
         try {
             console.log('   🔍 Tentativo connessione DeDust API...');
             
             const response = await axios.get('https://api.dedust.io/v2/pools', {
                 timeout: 10000,
                 headers: {
-                    'User-Agent': 'Mozilla/5.0 (TON-Bot/2.3)',
+                    'User-Agent': 'Mozilla/5.0 (TON-Bot/2.4)',
                     'Accept': 'application/json'
                 }
             });
             
             console.log(`   📡 DeDust API Response Status: ${response.status}`);
-            
-            if (!response.data || !Array.isArray(response.data)) {
-                console.log('   ⚠️ DeDust: Formato risposta non valido');
-                return [];
-            }
-            
             console.log(`   📊 DeDust: ${response.data.length} pool totali`);
             
-            // Filtri ULTRA minimi
+            // Step 1: Pool con TON
             const candidatePools = response.data.filter(pool => {
                 const hasAssets = pool.assets && Array.isArray(pool.assets);
                 if (!hasAssets) return false;
@@ -1136,29 +1257,42 @@ Scan #${this.scanCount}: 0 candidati
             
             console.log(`   📈 Pool con TON trovate: ${candidatePools.length}`);
             
-            // Filtri ancora più permissivi
-            const ultraPools = candidatePools.filter(pool => {
-                // Liquidità MOLTO bassa accettata
-                const hasMinLiquidity = (pool.total_liquidity_usd || 0) >= this.config.ultraPermissive.minLiquidity;
-                
-                // Età molto permissiva (24 ore)
-                const age = pool.created_at ? Date.now() - pool.created_at : 0;
-                const isNotTooOld = !pool.created_at || age <= this.config.ultraPermissive.maxTokenAge;
-                const isNotTooNew = !pool.created_at || age >= this.config.ultraPermissive.minTokenAge;
-                
-                if (hasMinLiquidity && isNotTooOld && isNotTooNew) {
-                    const otherAsset = pool.assets.find(a => a.symbol !== 'TON' && a.symbol !== 'WTON');
-                    if (otherAsset) {
-                        console.log(`   🎯 Pool ultra candidata: ${otherAsset.symbol} | Liq: $${pool.total_liquidity_usd || 0} | Age: ${Math.floor(age / (60*60*1000))} ore`);
-                    }
-                }
-                
-                return hasMinLiquidity && isNotTooOld && isNotTooNew;
+            // Step 2: Filtro liquidità MOLTO permissivo
+            const liquidityFiltered = candidatePools.filter(pool => {
+                return (pool.total_liquidity_usd || 0) >= this.config.debugIntensive.minLiquidity;
             });
             
-            console.log(`   🚀 Pool ultra filtrate: ${ultraPools.length}`);
+            console.log(`   💧 Pool con liquidità >= $${this.config.debugIntensive.minLiquidity}: ${liquidityFiltered.length}`);
             
-            return ultraPools.map(pool => {
+            // Step 3: Filtro età MOLTO permissivo
+            const ageFiltered = liquidityFiltered.filter(pool => {
+                const age = pool.created_at ? Date.now() - pool.created_at : 0;
+                const isNotTooOld = !pool.created_at || age <= this.config.debugIntensive.maxTokenAge;
+                const isNotTooNew = !pool.created_at || age >= this.config.debugIntensive.minTokenAge;
+                
+                if (pool.created_at) {
+                    const ageHours = age / (1000 * 60 * 60);
+                    const ageDays = age / (1000 * 60 * 60 * 24);
+                    console.log(`   🕐 Pool age: ${ageHours.toFixed(1)}h (${ageDays.toFixed(1)}d), liq: $${pool.total_liquidity_usd || 0}`);
+                }
+                
+                return isNotTooOld && isNotTooNew;
+            });
+            
+            console.log(`   ⏰ Pool con età corretta: ${ageFiltered.length}`);
+            console.log(`   🚀 Pool DeDust filtrate finale: ${ageFiltered.length}`);
+            
+            if (ageFiltered.length > 0) {
+                console.log('\n🎯 Prime 5 pool DeDust che passano i filtri:');
+                for (let i = 0; i < Math.min(5, ageFiltered.length); i++) {
+                    const pool = ageFiltered[i];
+                    const otherAsset = pool.assets.find(a => a.symbol !== 'TON' && a.symbol !== 'WTON');
+                    const age = pool.created_at ? Math.floor((Date.now() - pool.created_at) / (1000 * 60 * 60)) : 'N/A';
+                    console.log(`   ${i+1}. ${otherAsset?.symbol || 'UNK'} - $${pool.total_liquidity_usd || 0} (${age}h)`);
+                }
+            }
+            
+            return ageFiltered.map(pool => {
                 const otherAsset = pool.assets.find(a => a.symbol !== 'TON' && a.symbol !== 'WTON');
                 return {
                     address: otherAsset?.address || '',
@@ -1178,37 +1312,63 @@ Scan #${this.scanCount}: 0 candidati
         }
     }
 
-    async scanSTONfiUltraPermissive() {
+    async scanSTONfiDebug() {
         try {
             console.log('   🔍 Tentativo connessione STON.fi API...');
             
             const response = await axios.get('https://api.ston.fi/v1/pools', {
                 timeout: 8000,
                 headers: {
-                    'User-Agent': 'Mozilla/5.0 (TON-Bot/2.3)'
+                    'User-Agent': 'Mozilla/5.0 (TON-Bot/2.4)'
                 }
             });
             
             console.log(`   📡 STON.fi API Response Status: ${response.status}`);
             
             if (!response.data || !response.data.pool_list) {
+                console.log('   ⚠️ STON.fi: Nessun pool_list nella risposta');
                 return [];
             }
             
-            // Filtri ancora più permissivi per STON.fi
-            const ultraPools = response.data.pool_list.filter(pool => {
-                const age = pool.created_at ? Date.now() - pool.created_at : 0;
-                const isNotTooOld = !pool.created_at || age <= this.config.ultraPermissive.maxTokenAge;
-                const isNotTooNew = !pool.created_at || age >= this.config.ultraPermissive.minTokenAge;
-                const hasTON = pool.token0_symbol === 'TON' || pool.token1_symbol === 'TON';
-                const hasMinLiquidity = (pool.liquidity_usd || 0) >= this.config.ultraPermissive.minLiquidity;
-                
-                return isNotTooOld && isNotTooNew && hasTON && hasMinLiquidity;
+            console.log(`   📊 STON.fi: ${response.data.pool_list.length} pool totali`);
+            
+            // Step 1: Pool con TON
+            const candidatePools = response.data.pool_list.filter(pool => {
+                return pool.token0_symbol === 'TON' || pool.token1_symbol === 'TON';
             });
             
-            console.log(`   📊 STON.fi: ${ultraPools.length} pool ultra filtrate trovate`);
+            console.log(`   📈 Pool con TON trovate: ${candidatePools.length}`);
             
-            return ultraPools.map(pool => ({
+            // Step 2: Filtro liquidità
+            const liquidityFiltered = candidatePools.filter(pool => {
+                return (pool.liquidity_usd || 0) >= this.config.debugIntensive.minLiquidity;
+            });
+            
+            console.log(`   💧 Pool con liquidità >= $${this.config.debugIntensive.minLiquidity}: ${liquidityFiltered.length}`);
+            
+            // Step 3: Filtro età
+            const ageFiltered = liquidityFiltered.filter(pool => {
+                const age = pool.created_at ? Date.now() - pool.created_at : 0;
+                const isNotTooOld = !pool.created_at || age <= this.config.debugIntensive.maxTokenAge;
+                const isNotTooNew = !pool.created_at || age >= this.config.debugIntensive.minTokenAge;
+                
+                return isNotTooOld && isNotTooNew;
+            });
+            
+            console.log(`   ⏰ Pool con età corretta: ${ageFiltered.length}`);
+            console.log(`   📊 STON.fi: ${ageFiltered.length} pool filtrate trovate`);
+            
+            if (ageFiltered.length > 0) {
+                console.log('\n🎯 Prime 5 pool STON.fi che passano i filtri:');
+                for (let i = 0; i < Math.min(5, ageFiltered.length); i++) {
+                    const pool = ageFiltered[i];
+                    const otherToken = pool.token0_symbol === 'TON' ? pool.token1_symbol : pool.token0_symbol;
+                    const age = pool.created_at ? Math.floor((Date.now() - pool.created_at) / (1000 * 60 * 60)) : 'N/A';
+                    console.log(`   ${i+1}. ${otherToken || 'UNK'} - ${pool.liquidity_usd || 0} (${age}h)`);
+                }
+            }
+            
+            return ageFiltered.map(pool => ({
                 address: pool.token0_symbol === 'TON' ? pool.token1_address : pool.token0_address,
                 name: pool.token0_symbol === 'TON' ? pool.token1_name : pool.token0_name,
                 symbol: pool.token0_symbol === 'TON' ? pool.token1_symbol : pool.token0_symbol,
@@ -1225,81 +1385,330 @@ Scan #${this.scanCount}: 0 candidati
         }
     }
 
-    // =============================================================================
-    // FILTRI ULTRA PERMISSIVI v2.3
-    // =============================================================================
-
-    passesUltraPermissiveFilters(token) {
-        const filters = this.config.ultraPermissive;
-        
-        console.log(`   🔍 Analizzando ULTRA: ${token.name} (${token.symbol})`);
-        this.filterResults.totalScanned++;
-        
-        // 1. BLACKLIST SUPER RIDOTTA - solo scam ovvi
-        if (this.tokenBlacklist.has(token.address)) {
-            console.log(`   ❌ Token in blacklist`);
-            this.filterResults.failedScam++;
-            return false;
-        }
-        
-        // 2. CONTROLLI ANTI-SCAM SOLO CRITICI
-        if (this.isObviousScamToken(token)) {
-            console.log(`   ❌ Token ovviamente scam - bloccato`);
-            this.tokenBlacklist.add(token.address);
-            this.scamDetections.set(token.address, {
-                reason: 'Scam ovvio rilevato',
-                timestamp: Date.now(),
-                token: `${token.name} (${token.symbol})`
+    // METODI PER DEBUG INTENSIVO
+    async scanDeDustDebugIntensive() {
+        try {
+            console.log('   🔍 INTENSIVE DEBUG - DeDust API...');
+            
+            const response = await axios.get('https://api.dedust.io/v2/pools', {
+                timeout: 10000,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (TON-Bot/2.4)',
+                    'Accept': 'application/json'
+                }
             });
             
+            console.log(`   📡 DeDust Status: ${response.status}`);
+            console.log(`   📊 DeDust Pool totali: ${response.data ? response.data.length : 'N/A'}`);
+            
+            if (!response.data || !Array.isArray(response.data)) {
+                console.log('   ❌ DeDust: Risposta non valida');
+                return [];
+            }
+            
+            // DEBUG: Primi 3 pool
+            console.log('\n🔍 PRIMI 3 POOL DeDust:');
+            for (let i = 0; i < Math.min(3, response.data.length); i++) {
+                const pool = response.data[i];
+                console.log(`Pool ${i + 1}:`);
+                console.log(`  Address: ${pool.address || 'N/A'}`);
+                console.log(`  Assets: ${JSON.stringify(pool.assets)}`);
+                console.log(`  Liquidity: ${pool.total_liquidity_usd || 0}`);
+                console.log(`  Volume: ${pool.volume_24h_usd || 0}`);
+                console.log(`  Created: ${pool.created_at || 'N/A'}`);
+                if (pool.created_at) {
+                    const ageHours = (Date.now() - pool.created_at) / (1000 * 60 * 60);
+                    console.log(`  Age: ${ageHours.toFixed(1)} ore`);
+                }
+            }
+            
+            // Filtro TON
+            const tonPools = response.data.filter(pool => {
+                const hasAssets = pool.assets && Array.isArray(pool.assets);
+                if (!hasAssets) return false;
+                
+                return pool.assets.some(asset => 
+                    asset.symbol === 'TON' || 
+                    asset.symbol === 'WTON' || 
+                    asset.name?.toLowerCase().includes('ton')
+                );
+            });
+            
+            console.log(`\n📈 Pool con TON: ${tonPools.length}`);
+            
+            // Filtro liquidità minima $1
+            const liquidPools = tonPools.filter(pool => {
+                return (pool.total_liquidity_usd || 0) >= 1; // $1 minimo
+            });
+            
+            console.log(`💧 Pool con liquidità >= $1: ${liquidPools.length}`);
+            
+            // NO FILTRO ETÀ per vedere tutto
+            console.log(`✅ Pool finali (senza filtro età): ${liquidPools.length}`);
+            
+            if (liquidPools.length > 0) {
+                console.log('\n🎯 PRIMI 10 POOL FINALI DeDust:');
+                for (let i = 0; i < Math.min(10, liquidPools.length); i++) {
+                    const pool = liquidPools[i];
+                    const otherAsset = pool.assets.find(a => a.symbol !== 'TON' && a.symbol !== 'WTON');
+                    const age = pool.created_at ? Math.floor((Date.now() - pool.created_at) / (1000 * 60 * 60)) : 'N/A';
+                    console.log(`   ${i+1}. ${otherAsset?.symbol || 'UNK'} - ${pool.total_liquidity_usd || 0} (${age}h)`);
+                }
+            }
+            
+            return liquidPools.map(pool => {
+                const otherAsset = pool.assets.find(a => a.symbol !== 'TON' && a.symbol !== 'WTON');
+                return {
+                    address: otherAsset?.address || '',
+                    name: otherAsset?.name || 'Unknown',
+                    symbol: otherAsset?.symbol || 'UNK',
+                    liquidity: pool.total_liquidity_usd || 0,
+                    volume24h: pool.volume_24h_usd || 0,
+                    dex: 'DeDust',
+                    poolAddress: pool.address,
+                    createdAt: pool.created_at || Date.now()
+                };
+            }).filter(token => token.address && token.symbol !== 'UNK');
+            
+        } catch (error) {
+            console.log(`   ❌ DeDust INTENSIVE Error: ${error.message}`);
+            return [];
+        }
+    }
+
+    async scanSTONfiDebugIntensive() {
+        try {
+            console.log('   🔍 INTENSIVE DEBUG - STON.fi API...');
+            
+            const response = await axios.get('https://api.ston.fi/v1/pools', {
+                timeout: 8000,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (TON-Bot/2.4)'
+                }
+            });
+            
+            console.log(`   📡 STON.fi Status: ${response.status}`);
+            console.log(`   📊 STON.fi Pool totali: ${response.data?.pool_list ? response.data.pool_list.length : 'N/A'}`);
+            
+            if (!response.data || !response.data.pool_list) {
+                console.log('   ❌ STON.fi: Nessun pool_list');
+                return [];
+            }
+            
+            // DEBUG: Primi 3 pool
+            console.log('\n🔍 PRIMI 3 POOL STON.fi:');
+            for (let i = 0; i < Math.min(3, response.data.pool_list.length); i++) {
+                const pool = response.data.pool_list[i];
+                console.log(`Pool ${i + 1}:`);
+                console.log(`  Address: ${pool.address || 'N/A'}`);
+                console.log(`  Token0: ${pool.token0_symbol} (${pool.token0_name})`);
+                console.log(`  Token1: ${pool.token1_symbol} (${pool.token1_name})`);
+                console.log(`  Liquidity: ${pool.liquidity_usd || 0}`);
+                console.log(`  Volume: ${pool.volume_24h_usd || 0}`);
+                console.log(`  Created: ${pool.created_at || 'N/A'}`);
+                if (pool.created_at) {
+                    const ageHours = (Date.now() - pool.created_at) / (1000 * 60 * 60);
+                    console.log(`  Age: ${ageHours.toFixed(1)} ore`);
+                }
+            }
+            
+            // Filtro TON
+            const tonPools = response.data.pool_list.filter(pool => {
+                return pool.token0_symbol === 'TON' || pool.token1_symbol === 'TON';
+            });
+            
+            console.log(`\n📈 Pool con TON: ${tonPools.length}`);
+            
+            // Filtro liquidità minima $1
+            const liquidPools = tonPools.filter(pool => {
+                return (pool.liquidity_usd || 0) >= 1; // $1 minimo
+            });
+            
+            console.log(`💧 Pool con liquidità >= $1: ${liquidPools.length}`);
+            
+            // NO FILTRO ETÀ per vedere tutto
+            console.log(`✅ Pool finali (senza filtro età): ${liquidPools.length}`);
+            
+            if (liquidPools.length > 0) {
+                console.log('\n🎯 PRIMI 10 POOL FINALI STON.fi:');
+                for (let i = 0; i < Math.min(10, liquidPools.length); i++) {
+                    const pool = liquidPools[i];
+                    const otherToken = pool.token0_symbol === 'TON' ? pool.token1_symbol : pool.token0_symbol;
+                    const age = pool.created_at ? Math.floor((Date.now() - pool.created_at) / (1000 * 60 * 60)) : 'N/A';
+                    console.log(`   ${i+1}. ${otherToken} - ${pool.liquidity_usd || 0} (${age}h)`);
+                }
+            }
+            
+            return liquidPools.map(pool => ({
+                address: pool.token0_symbol === 'TON' ? pool.token1_address : pool.token0_address,
+                name: pool.token0_symbol === 'TON' ? pool.token1_name : pool.token0_name,
+                symbol: pool.token0_symbol === 'TON' ? pool.token1_symbol : pool.token0_symbol,
+                liquidity: pool.liquidity_usd || 0,
+                volume24h: pool.volume_24h_usd || 0,
+                dex: 'STON.fi',
+                poolAddress: pool.address,
+                createdAt: pool.created_at || Date.now()
+            }));
+            
+        } catch (error) {
+            console.log(`   ❌ STON.fi INTENSIVE Error: ${error.message}`);
+            return [];
+        }
+    }
+
+    // =============================================================================
+    // FILTRI DEBUG
+    // =============================================================================
+
+    passesFiltersDebug(token) {
+        const filters = this.config.debugIntensive;
+        
+        console.log(`\n🔍 FILTRI DEBUG per ${token.name} (${token.symbol}):`);
+        this.filterResults.totalScanned++;
+        
+        // 1. BLACKLIST
+        if (this.tokenBlacklist.has(token.address)) {
+            console.log(`   ❌ FALLITO: Token in blacklist`);
             this.filterResults.failedScam++;
-            this.notify(`🛡️ SCAM OVVIO bloccato\nToken: ${token.name} (${token.symbol})`, 'scam', true);
             return false;
         }
+        console.log(`   ✅ PASSATO: Non in blacklist`);
         
-        // 3. LIQUIDITÀ RIDICOLMENTE BASSA
+        // 2. SCAM CHECK
+        if (this.isObviousScamToken(token)) {
+            console.log(`   ❌ FALLITO: Scam ovvio rilevato`);
+            this.tokenBlacklist.add(token.address);
+            this.filterResults.failedScam++;
+            return false;
+        }
+        console.log(`   ✅ PASSATO: Non è scam ovvio`);
+        
+        // 3. LIQUIDITÀ
         if (token.liquidity < filters.minLiquidity) {
-            console.log(`   ❌ Liquidità troppo bassa: $${token.liquidity} < $${filters.minLiquidity}`);
+            console.log(`   ❌ FALLITO: Liquidità ${token.liquidity} < ${filters.minLiquidity}`);
             this.filterResults.failedLiquidity++;
             return false;
         }
+        console.log(`   ✅ PASSATO: Liquidità ${token.liquidity} >= ${filters.minLiquidity}`);
         
-        // 4. ETÀ ULTRA PERMISSIVA
+        // 4. ETÀ - CON DEBUG DETTAGLIATO
         const tokenAge = Date.now() - (token.createdAt || Date.now() - 3600000);
         const minAge = filters.minTokenAge;
         const maxAge = filters.maxTokenAge;
+        const ageMinutes = tokenAge / (1000 * 60);
+        const ageHours = tokenAge / (1000 * 60 * 60);
+        const ageDays = tokenAge / (1000 * 60 * 60 * 24);
+        
+        console.log(`   🕐 Token age: ${ageMinutes.toFixed(1)} min (${ageHours.toFixed(1)} ore, ${ageDays.toFixed(1)} giorni)`);
+        console.log(`   📏 Limiti: ${minAge / (1000 * 60)} min - ${maxAge / (1000 * 60 * 60 * 24)} giorni`);
         
         if (tokenAge < minAge) {
-            console.log(`   ❌ Token troppo nuovo: ${(tokenAge/1000/60).toFixed(1)} min < ${(minAge/1000/60).toFixed(1)} min`);
+            console.log(`   ❌ FALLITO: Troppo nuovo ${ageMinutes.toFixed(1)} min < ${(minAge / (1000 * 60)).toFixed(1)} min`);
             this.filterResults.failedAge++;
             return false;
         }
+        console.log(`   ✅ PASSATO: Non troppo nuovo`);
         
         if (tokenAge > maxAge) {
-            console.log(`   ❌ Token troppo vecchio: ${(tokenAge/1000/60/60/24).toFixed(1)} giorni > ${(maxAge/1000/60/60/24).toFixed(1)} giorni`);
+            console.log(`   ❌ FALLITO: Troppo vecchio ${ageDays.toFixed(1)} giorni > ${(maxAge / (1000 * 60 * 60 * 24)).toFixed(1)} giorni`);
             this.filterResults.failedAge++;
             return false;
         }
+        console.log(`   ✅ PASSATO: Non troppo vecchio`);
         
-        // 5. KEYWORDS AMPLIATE AL MASSIMO
-        const hasKeyword = filters.strongKeywords.some(keyword => 
-            token.name.toLowerCase().includes(keyword.toLowerCase()) || 
-            token.symbol.toLowerCase().includes(keyword.toLowerCase())
-        );
+        // 5. KEYWORDS - CON DEBUG DETTAGLIATO
+        const tokenText = `${token.name} ${token.symbol}`.toLowerCase();
+        console.log(`   🔤 Testo da analizzare: "${tokenText}"`);
         
-        if (!hasKeyword) {
-            console.log(`   ❌ Nessuna keyword in: "${token.name}" o "${token.symbol}"`);
+        const matchedKeywords = [];
+        for (const keyword of filters.strongKeywords) {
+            if (tokenText.includes(keyword.toLowerCase())) {
+                matchedKeywords.push(keyword);
+            }
+        }
+        
+        console.log(`   🎯 Keywords trovate: [${matchedKeywords.join(', ')}]`);
+        console.log(`   📊 Totale keywords trovate: ${matchedKeywords.length}`);
+        
+        if (matchedKeywords.length === 0) {
+            console.log(`   ❌ FALLITO: Nessuna keyword trovata`);
+            console.log(`   💡 Prime 20 keywords monitorate: ${filters.strongKeywords.slice(0, 20).join(', ')}...`);
             this.filterResults.failedKeywords++;
             return false;
         }
         
+        console.log(`   ✅ PASSATO: ${matchedKeywords.length} keywords trovate!`);
+        
         this.filterResults.passedBasic++;
-        console.log(`   ✅ ${token.symbol} supera tutti i filtri ultra (Liq: $${token.liquidity})`);
+        console.log(`   🎉 TOKEN APPROVATO: ${token.symbol} supera tutti i filtri!`);
+        return true;
+    }
+
+    passesFiltersDebugIntensive(token) {
+        const filters = this.config.debugIntensive;
+        
+        console.log(`\n🔬 INTENSIVE FILTRI DEBUG per ${token.name} (${token.symbol}):`);
+        console.log(`   💧 Liquidità: ${token.liquidity}`);
+        console.log(`   🕐 Created: ${token.createdAt}`);
+        
+        if (token.createdAt) {
+            const age = Date.now() - token.createdAt;
+            const ageHours = age / (1000 * 60 * 60);
+            const ageDays = age / (1000 * 60 * 60 * 24);
+            console.log(`   📊 Age: ${ageHours.toFixed(1)} ore (${ageDays.toFixed(1)} giorni)`);
+        }
+        
+        this.filterResults.totalScanned++;
+        
+        // 1. BLACKLIST
+        if (this.tokenBlacklist.has(token.address)) {
+            console.log(`   ❌ RIFIUTATO: In blacklist`);
+            this.filterResults.failedScam++;
+            return false;
+        }
+        
+        // 2. SCAM CHECK MINIMALE
+        if (this.isObviousScamToken(token)) {
+            console.log(`   ❌ RIFIUTATO: Scam ovvio`);
+            this.tokenBlacklist.add(token.address);
+            this.filterResults.failedScam++;
+            return false;
+        }
+        
+        // 3. LIQUIDITÀ RIDOTTISSIMA
+        if (token.liquidity < filters.minLiquidity) {
+            console.log(`   ❌ RIFIUTATO: Liquidità troppo bassa`);
+            this.filterResults.failedLiquidity++;
+            return false;
+        }
+        
+        // 4. ETÀ
+        const tokenAge = Date.now() - (token.createdAt || Date.now() - 3600000);
+        if (tokenAge < filters.minTokenAge || tokenAge > filters.maxTokenAge) {
+            console.log(`   ❌ RIFIUTATO: Età non valida`);
+            this.filterResults.failedAge++;
+            return false;
+        }
+        
+        // 5. KEYWORDS
+        const tokenText = `${token.name} ${token.symbol}`.toLowerCase();
+        const hasKeyword = filters.strongKeywords.some(keyword => 
+            tokenText.includes(keyword.toLowerCase())
+        );
+        
+        if (!hasKeyword) {
+            console.log(`   ❌ RIFIUTATO: Nessuna keyword`);
+            this.filterResults.failedKeywords++;
+            return false;
+        }
+        
+        console.log(`   ✅ APPROVATO: Passa tutti i filtri`);
+        this.filterResults.passedBasic++;
         return true;
     }
 
     // =============================================================================
-    // ANTI-SCAM RIDOTTO - SOLO SCAM OVVI
+    // ANTI-SCAM MINIMALE
     // =============================================================================
 
     isObviousScamToken(token) {
@@ -1307,50 +1716,41 @@ Scan #${this.scanCount}: 0 candidati
         const symbol = token.symbol.toLowerCase();
         const combined = `${name} ${symbol}`;
         
-        // SOLO GLI SCAM PIÙ OVVI E PERICOLOSI
+        // SOLO I PIÙ OVVI
         const obviousScamPatterns = [
-            // Test e fake ovvi
             /^test$/i, /^fake$/i, /^scam$/i, /^rug$/i,
-            
-            // Pattern tecnici ovviamente sbagliati
-            /^[a-f0-9]{40}$/i,  // Solo hash completo
+            /^[a-f0-9]{40}$/i,  // Solo hash
             /^[0-9]{10,}$/,     // Solo numeri lunghi
             /(.)\1{6,}/,        // Troppi caratteri ripetuti
             /^.{1}$/,           // Solo 1 carattere
             /^.{100,}$/,        // Troppo lungo
-            
-            // Contenuti adult/illegali
             /fuck/i, /shit/i, /xxx/i, /sex/i, /porn/i,
-            
-            // Imitazioni PERFETTE di coin famosi (non simili, identiche)
             /^bitcoin$/i, /^btc$/i, /^ethereum$/i, /^eth$/i, /^usdt$/i, /^usdc$/i
         ];
         
-        // Controlla solo pattern ovvi
         for (const pattern of obviousScamPatterns) {
             if (pattern.test(combined)) {
-                console.log(`   🚨 Scam OVVIO rilevato: ${pattern} in "${combined}"`);
+                console.log(`   🚨 Scam OVVIO: ${pattern} in "${combined}"`);
                 return true;
             }
         }
         
-        // Liquidità zero o negativa
         if (token.liquidity <= 0) {
             console.log(`   🚨 Liquidità invalida: ${token.liquidity}`);
             return true;
         }
         
-        return false; // Tutto il resto è permesso!
+        return false;
     }
 
     // =============================================================================
-    // ANALISI TOKEN ULTRA PERMISSIVA v2.3
+    // ANALISI TOKEN DEBUG
     // =============================================================================
 
-    async ultraPermissiveTokenAnalysis(token) {
-        console.log(`🔬 Analisi ultra permissiva: ${token.name} (${token.symbol})`);
+    async debugTokenAnalysis(token) {
+        console.log(`🔬 Analisi debug: ${token.name} (${token.symbol})`);
         
-        let confidenceScore = 0;
+        let confidenceScore = 50; // Base alto per debug
         const analysis = {
             shouldBuy: false,
             confidenceScore: 0,
@@ -1360,39 +1760,35 @@ Scan #${this.scanCount}: 0 candidati
         };
         
         try {
-            // BASE SCORE ALTO per essere ultra permissivi
-            confidenceScore = 40; // Invece di 0
-            
             // Analisi liquidità (30% peso)
-            const liquidityScore = this.analyzeLiquidityScoreUltra(token);
+            const liquidityScore = this.analyzeLiquidityScoreDebug(token);
             confidenceScore += liquidityScore * 0.3;
             analysis.reasons.push(`Liquidità: ${liquidityScore}/100`);
             
-            // Analisi volume (20% peso) - ridotto
-            const volumeScore = this.analyzeVolumeScoreUltra(token);
+            // Analisi volume (20% peso)
+            const volumeScore = this.analyzeVolumeScoreDebug(token);
             confidenceScore += volumeScore * 0.2;
             analysis.reasons.push(`Volume: ${volumeScore}/100`);
             
-            // Analisi keyword (40% peso) - aumentato molto
-            const keywordScore = this.analyzeKeywordScoreUltra(token);
+            // Analisi keyword (40% peso)
+            const keywordScore = this.analyzeKeywordScoreDebug(token);
             confidenceScore += keywordScore * 0.4;
             analysis.reasons.push(`Keywords: ${keywordScore}/100`);
             
             // Analisi tecnica (10% peso)
-            const technicalScore = this.analyzeTechnicalScoreUltra(token);
+            const technicalScore = this.analyzeTechnicalScoreDebug(token);
             confidenceScore += technicalScore * 0.1;
             analysis.reasons.push(`Tecnica: ${technicalScore}/100`);
             
             analysis.confidenceScore = Math.round(confidenceScore);
             
-            // Decisione finale ULTRA PERMISSIVA
-            const minConfidence = this.config.ultraPermissive.minConfidenceScore;
+            const minConfidence = this.config.debugIntensive.minConfidenceScore;
             
             if (analysis.confidenceScore >= minConfidence) {
                 analysis.shouldBuy = true;
                 this.filterResults.approved++;
-                analysis.reasons.push(`✅ APPROVATO ULTRA - Confidence: ${analysis.confidenceScore}%`);
-                console.log(`   ✅ APPROVATO ULTRA - Confidence: ${analysis.confidenceScore}%`);
+                analysis.reasons.push(`✅ APPROVATO DEBUG - Confidence: ${analysis.confidenceScore}%`);
+                console.log(`   ✅ APPROVATO DEBUG - Confidence: ${analysis.confidenceScore}%`);
             } else {
                 analysis.rejectionReason = `Confidence ${analysis.confidenceScore}% < ${minConfidence}%`;
                 analysis.reasons.push(`❌ RIFIUTATO - ${analysis.rejectionReason}`);
@@ -1408,76 +1804,45 @@ Scan #${this.scanCount}: 0 candidati
         return analysis;
     }
 
-    analyzeLiquidityScoreUltra(token) {
+    analyzeLiquidityScoreDebug(token) {
         let score = 0;
         
-        // Scale ULTRA basse per essere più permissivi
-        if (token.liquidity > 1000) score = 100;       // Era 5000
-        else if (token.liquidity > 500) score = 95;    // Era 2000
-        else if (token.liquidity > 250) score = 90;    // Era 1000
-        else if (token.liquidity > 100) score = 85;    // Era 500
-        else if (token.liquidity > 50) score = 80;     // Era 250
-        else if (token.liquidity > 25) score = 75;     // Era 100
-        else if (token.liquidity > 10) score = 70;     // Nuovo
-        else if (token.liquidity > 5) score = 65;      // SOGLIA MINIMA v2.3
-        else score = 50; // Anche sotto $5 ottiene punti!
+        if (token.liquidity > 500) score = 100;
+        else if (token.liquidity > 100) score = 90;
+        else if (token.liquidity > 50) score = 80;
+        else if (token.liquidity > 25) score = 70;
+        else if (token.liquidity > 10) score = 60;
+        else if (token.liquidity > 5) score = 50;
+        else if (token.liquidity > 1) score = 40;
+        else score = 20;
         
         console.log(`   💧 Liquidità ${token.liquidity} → Score: ${score}/100`);
         return score;
     }
 
-    analyzeVolumeScoreUltra(token) {
-        let score = 50; // Base score alto
+    analyzeVolumeScoreDebug(token) {
+        let score = 50;
         const volumeRatio = token.volume24h / Math.max(token.liquidity, 1);
         
-        if (volumeRatio > 0.3) score = 100;
-        else if (volumeRatio > 0.1) score = 90;
-        else if (volumeRatio > 0.05) score = 80;
-        else if (volumeRatio > 0.01) score = 70;
-        else if (volumeRatio > 0.005) score = 60; // Nuovo
-        else score = 50; // Minimo decente
+        if (volumeRatio > 0.2) score = 100;
+        else if (volumeRatio > 0.1) score = 80;
+        else if (volumeRatio > 0.05) score = 60;
+        else if (volumeRatio > 0.01) score = 40;
+        else score = 20;
         
         return score;
     }
 
-    analyzeKeywordScoreUltra(token) {
-        const strongKeywords = this.config.ultraPermissive.strongKeywords;
-        let score = 50; // Base score alto
+    analyzeKeywordScoreDebug(token) {
+        const strongKeywords = this.config.debugIntensive.strongKeywords;
+        let score = 60; // Base alto
         
         const tokenText = `${token.name} ${token.symbol}`.toLowerCase();
         
-        // BONUS MEGA per keywords specifiche
-        const ultraKeywordBonuses = {
-            'blum': 60,      // MASSIMO bonus per BLUM
-            'ton': 50,       // Altissimo per TON native
-            'doge': 45,      // Meme coin
-            'pepe': 45,
-            'shiba': 45,
-            'moon': 40,
-            'rocket': 40,
-            'gem': 40,
-            'pump': 35,
-            'bull': 35,
-            'lambo': 35,
-            'diamond': 30,
-            'king': 30,
-            'royal': 30,
-            'safe': 25,
-            'meta': 25,
-            'defi': 25,
-            'yield': 25,
-            'farm': 25,
-            'stake': 25,
-            'coin': 20,
-            'token': 15,
-            'cat': 15,
-            'dog': 15,
-            'fire': 15,
-            'ice': 15,
-            'gold': 15,
-            'green': 10,
-            'fast': 10,
-            'speed': 10
+        const keywordBonuses = {
+            'blum': 50, 'ton': 40, 'doge': 35, 'pepe': 35, 'shiba': 35,
+            'moon': 30, 'rocket': 30, 'gem': 30, 'safe': 20, 'pump': 25,
+            'bull': 25, 'diamond': 20, 'coin': 15, 'token': 10
         };
         
         let bestBonus = 0;
@@ -1485,7 +1850,7 @@ Scan #${this.scanCount}: 0 candidati
         
         for (const keyword of strongKeywords) {
             if (tokenText.includes(keyword.toLowerCase())) {
-                const bonus = ultraKeywordBonuses[keyword.toLowerCase()] || 5; // Minimo 5 punti
+                const bonus = keywordBonuses[keyword.toLowerCase()] || 5;
                 if (bonus > bestBonus) {
                     bestBonus = bonus;
                 }
@@ -1495,63 +1860,41 @@ Scan #${this.scanCount}: 0 candidati
         
         score += bestBonus;
         
-        if (bestBonus > 0) {
-            console.log(`   🎯 Keywords "${matchedKeywords.join(', ')}" rilevate! Bonus +${bestBonus}`);
-        }
-        
-        // BONUS MEGA per multiple keywords
         if (matchedKeywords.length > 1) {
-            const multiBonus = Math.min((matchedKeywords.length - 1) * 8, 25); // Aumentato
+            const multiBonus = Math.min((matchedKeywords.length - 1) * 5, 15);
             score += multiBonus;
-            console.log(`   🔥 ${matchedKeywords.length} keywords! Bonus multiplo +${multiBonus}`);
         }
         
-        // BONUS speciale per combinazioni
-        if (tokenText.includes('moon') && tokenText.includes('rocket')) {
-            score += 15;
-            console.log(`   🚀 Combo "moon + rocket"! Bonus +15`);
-        }
-        
-        if (tokenText.includes('doge') || tokenText.includes('shiba') || tokenText.includes('pepe')) {
-            score += 10;
-            console.log(`   🐕 Meme coin detected! Bonus +10`);
-        }
-        
+        console.log(`   🎯 Keywords: [${matchedKeywords.join(', ')}] → Score: ${score}/100`);
         return Math.min(score, 100);
     }
 
-    analyzeTechnicalScoreUltra(token) {
-        let score = 60; // Base alto
+    analyzeTechnicalScoreDebug(token) {
+        let score = 60;
         
-        // Bonus per DEX
-        if (token.dex === 'DeDust') score += 15;
-        if (token.dex === 'STON.fi') score += 15;
+        if (token.dex === 'DeDust') score += 10;
+        if (token.dex === 'STON.fi') score += 10;
         
-        // Bonus per età "sweet spot" AMPLIATO
         const tokenAge = Date.now() - (token.createdAt || Date.now());
         const ageHours = tokenAge / (1000 * 60 * 60);
         
-        if (ageHours >= 0.5 && ageHours <= 48) score += 25;    // 30min-2 giorni (AMPLIATO)
-        else if (ageHours >= 0.1 && ageHours <= 168) score += 15; // 6min-7 giorni
-        else if (ageHours <= 720) score += 5; // Fino a 30 giorni
-        
-        // Penalty RIDOTTE
-        if (ageHours < 0.05) score -= 10; // Solo se meno di 3 minuti
+        if (ageHours >= 1 && ageHours <= 48) score += 20;
+        else if (ageHours >= 0.5 && ageHours <= 168) score += 10;
         
         return Math.max(Math.min(score, 100), 0);
     }
 
-    async ultraPermissiveBuy(token, analysis) {
+    async debugBuy(token, analysis) {
         try {
-            const buyAmount = this.config.ultraPermissive.maxTradeSize;
+            const buyAmount = this.config.debugIntensive.maxTradeSize;
             
-            console.log(`💰 ACQUISTO ULTRA PERMISSIVO v2.3: ${buyAmount} TON di ${token.symbol}`);
+            console.log(`💰 ACQUISTO DEBUG v2.4: ${buyAmount} TON di ${token.symbol}`);
             console.log(`   📊 Confidence: ${analysis.confidenceScore}%`);
             console.log(`   💧 Liquidità: ${token.liquidity.toFixed(0)}`);
             console.log(`   🎯 Motivi: ${analysis.reasons.join(', ')}`);
-            console.log(`   🚀 Ultra Permissivo: Massimo rischio/reward`);
+            console.log(`   🔍 Debug: Massima visibilità attiva`);
             
-            const txHash = `ultra_${Math.random().toString(16).substr(2, 10)}`;
+            const txHash = `debug_${Math.random().toString(16).substr(2, 10)}`;
             
             const position = {
                 name: token.name,
@@ -1562,12 +1905,12 @@ Scan #${this.scanCount}: 0 candidati
                 confidence: analysis.confidenceScore,
                 dex: token.dex,
                 txHash,
-                stopLoss: this.config.ultraPermissive.stopLossPercent,
-                takeProfit: this.config.ultraPermissive.takeProfitPercent,
+                stopLoss: this.config.debugIntensive.stopLossPercent,
+                takeProfit: this.config.debugIntensive.takeProfitPercent,
                 liquidity: token.liquidity,
                 reasons: analysis.reasons,
-                version: '2.3-ultra',
-                risk: 'ULTRA-HIGH' // Marcatore speciale
+                version: '2.4-debug',
+                debugMode: true
             };
             
             this.positions.set(token.address, position);
@@ -1576,39 +1919,35 @@ Scan #${this.scanCount}: 0 candidati
             console.log(`   🛡️ Stop Loss: ${position.stopLoss}%`);
             console.log(`   🎯 Take Profit: ${position.takeProfit}%`);
             
-            // Notifica Telegram con enfasi ultra
-            await this.notifyUltraTrade('buy', position);
-            
-            // Monitoraggio ultra aggressivo
-            this.startUltraPositionMonitoring(token.address);
+            await this.notifyDebugTrade('buy', position);
+            this.startDebugPositionMonitoring(token.address);
             
         } catch (error) {
-            console.error('❌ Errore acquisto ultra:', error.message);
-            await this.notify(`❌ Errore acquisto ultra ${token.symbol}: ${error.message}`, 'error');
+            console.error('❌ Errore acquisto debug:', error.message);
+            await this.notify(`❌ Errore acquisto debug ${token.symbol}: ${error.message}`, 'error');
         }
     }
 
-    async notifyUltraTrade(action, position, pnl = null) {
+    async notifyDebugTrade(action, position, pnl = null) {
         let message = '';
         let type = 'trade';
         
         if (action === 'buy') {
             message = `
-🚀 *ACQUISTO ULTRA PERMISSIVO v2.3*
+🔍 *ACQUISTO DEBUG v2.4*
 Token: ${position.symbol} (${position.name})
 Amount: ${position.amount.toFixed(4)} TON
 Confidence: ${position.confidence}%
-Risk Level: ${position.risk}
+Debug Mode: ${position.debugMode ? '✅' : '❌'}
 DEX: ${position.dex}
 Stop Loss: ${position.stopLoss}%
 Take Profit: ${position.takeProfit}%
 Liquidity: ${position.liquidity.toFixed(0)}
 
-🎯 *Motivi:*
-${position.reasons ? position.reasons.join('\n') : 'Analisi ultra permissiva'}
+🎯 *Motivi Debug:*
+${position.reasons ? position.reasons.join('\n') : 'Analisi debug standard'}
 
-⚡ *ULTRA PERMISSIVO:* Massimo rischio/reward!
-🔍 Filtri minimi applicati
+🔍 *Debug Mode:* Massima visibilità!
             `.trim();
         } else if (action === 'sell') {
             const pnlPercent = (pnl / position.amount) * 100;
@@ -1616,11 +1955,11 @@ ${position.reasons ? position.reasons.join('\n') : 'Analisi ultra permissiva'}
             const pnlIcon = pnlPercent > 0 ? '📈' : '📉';
             
             message = `
-${pnlIcon} *VENDITA ULTRA v2.3*
+${pnlIcon} *VENDITA DEBUG v2.4*
 Token: ${position.symbol}
 P&L: ${pnl > 0 ? '+' : ''}${pnl.toFixed(4)} TON (${pnlPercent > 0 ? '+' : ''}${pnlPercent.toFixed(2)}%)
 Time Held: ${this.formatTime(Date.now() - position.entryTime)}
-Risk era: ${position.risk}
+Debug Mode: ${position.debugMode ? '✅' : '❌'}
 Confidence era: ${position.confidence}%
 Motivo: ${action === 'stop_loss' ? 'Stop Loss' : action === 'take_profit' ? 'Take Profit' : 'Exit'}
             `.trim();
@@ -1629,7 +1968,7 @@ Motivo: ${action === 'stop_loss' ? 'Stop Loss' : action === 'take_profit' ? 'Tak
         await this.notify(message, type);
     }
 
-    startUltraPositionMonitoring(tokenAddress) {
+    startDebugPositionMonitoring(tokenAddress) {
         const monitorInterval = setInterval(async () => {
             try {
                 const position = this.positions.get(tokenAddress);
@@ -1638,77 +1977,61 @@ Motivo: ${action === 'stop_loss' ? 'Stop Loss' : action === 'take_profit' ? 'Tak
                     return;
                 }
                 
-                // Volatilità più alta per ultra permissivo
-                const priceChange = (Math.random() - 0.5) * 25; // ±12.5% (aumentato)
+                const priceChange = (Math.random() - 0.5) * 20; // ±10%
                 
-                if (this.scanCount % 3 === 0) { // Report più frequente
-                    console.log(`📊 ULTRA ${position.symbol}: ${priceChange > 0 ? '+' : ''}${priceChange.toFixed(2)}%`);
+                if (this.scanCount % 4 === 0) {
+                    console.log(`📊 DEBUG ${position.symbol}: ${priceChange > 0 ? '+' : ''}${priceChange.toFixed(2)}%`);
                 }
                 
-                // Stop Loss check
                 if (priceChange <= position.stopLoss) {
-                    console.log(`🛑 ULTRA STOP LOSS ${position.symbol}: ${priceChange.toFixed(2)}%`);
-                    await this.ultraSell(tokenAddress, 'stop_loss');
+                    console.log(`🛑 DEBUG STOP LOSS ${position.symbol}: ${priceChange.toFixed(2)}%`);
+                    await this.debugSell(tokenAddress, 'stop_loss');
                     clearInterval(monitorInterval);
                     return;
                 }
                 
-                // Take Profit check
                 if (priceChange >= position.takeProfit) {
-                    console.log(`🎯 ULTRA TAKE PROFIT ${position.symbol}: ${priceChange.toFixed(2)}%`);
-                    await this.ultraSell(tokenAddress, 'take_profit');
+                    console.log(`🎯 DEBUG TAKE PROFIT ${position.symbol}: ${priceChange.toFixed(2)}%`);
+                    await this.debugSell(tokenAddress, 'take_profit');
                     clearInterval(monitorInterval);
                     return;
-                }
-                
-                // Trailing Stop ultra aggressivo
-                if (priceChange > 15 && !position.trailingStopActive) {
-                    position.trailingStopActive = true;
-                    position.trailingStopPrice = position.entryPrice * (1 + priceChange/100) * 0.85; // 85% invece di 90%
-                    console.log(`📈 ULTRA trailing stop attivato per ${position.symbol}`);
-                    await this.notify(`🚀 ULTRA trailing stop attivato per ${position.symbol}\nPrezzo: +${priceChange.toFixed(2)}%\nRisk: ${position.risk}`, 'trade');
                 }
                 
             } catch (error) {
-                console.error(`❌ Errore monitoraggio ultra ${tokenAddress}:`, error.message);
+                console.error(`❌ Errore monitoraggio debug ${tokenAddress}:`, error.message);
             }
-        }, 20000); // Ogni 20 secondi (più veloce)
+        }, 25000); // Ogni 25 secondi
         
-        // Timeout più corto per ultra
         setTimeout(async () => {
             clearInterval(monitorInterval);
             if (this.positions.has(tokenAddress)) {
-                console.log(`⏰ ULTRA timeout raggiunto per ${this.positions.get(tokenAddress).symbol}`);
-                await this.ultraSell(tokenAddress, 'timeout');
+                console.log(`⏰ DEBUG timeout raggiunto per ${this.positions.get(tokenAddress).symbol}`);
+                await this.debugSell(tokenAddress, 'timeout');
             }
-        }, this.config.ultraPermissive.maxHoldTime);
+        }, this.config.debugIntensive.maxHoldTime);
     }
 
-    async ultraSell(tokenAddress, reason) {
+    async debugSell(tokenAddress, reason) {
         try {
             const position = this.positions.get(tokenAddress);
             if (!position) return;
             
-            console.log(`💸 VENDITA ULTRA ${position.symbol} | Motivo: ${reason}`);
+            console.log(`💸 VENDITA DEBUG ${position.symbol} | Motivo: ${reason}`);
             
-            // P&L con più volatilità per ultra permissivo
             let pnl;
             if (reason === 'stop_loss') {
                 pnl = position.amount * (position.stopLoss / 100);
             } else if (reason === 'take_profit') {
                 pnl = position.amount * (position.takeProfit / 100);
             } else {
-                // Random con bias basato su confidence + bonus per ultra
-                const confidenceBias = (position.confidence - 40) / 100; // Adattato per ultra
-                const ultraBonus = 0.1; // Bonus per il rischio ultra
-                pnl = (Math.random() - 0.25 + confidenceBias + ultraBonus) * 0.15 * position.amount;
+                const confidenceBias = (position.confidence - 50) / 100;
+                pnl = (Math.random() - 0.2 + confidenceBias) * 0.12 * position.amount;
             }
             
             const pnlPercent = (pnl / position.amount) * 100;
             
-            console.log(`📊 ULTRA P&L: ${pnl > 0 ? '+' : ''}${pnl.toFixed(4)} TON (${pnl > 0 ? '+' : ''}${pnlPercent.toFixed(2)}%)`);
+            console.log(`📊 DEBUG P&L: ${pnl > 0 ? '+' : ''}${pnl.toFixed(4)} TON (${pnl > 0 ? '+' : ''}${pnlPercent.toFixed(2)}%)`);
             
-            // Aggiorna statistiche
             this.stats.totalPnL += pnl;
             this.stats.dailyPnL += pnl;
             
@@ -1716,7 +2039,6 @@ Motivo: ${action === 'stop_loss' ? 'Stop Loss' : action === 'take_profit' ? 'Tak
                 this.stats.winningTrades++;
             }
             
-            // Aggiorna drawdown
             if (pnl < 0) {
                 this.stats.currentDrawdown += Math.abs(pnl);
                 this.stats.maxDrawdown = Math.max(this.stats.maxDrawdown, this.stats.currentDrawdown);
@@ -1724,19 +2046,17 @@ Motivo: ${action === 'stop_loss' ? 'Stop Loss' : action === 'take_profit' ? 'Tak
                 this.stats.currentDrawdown = Math.max(0, this.stats.currentDrawdown - pnl);
             }
             
-            // Notifica Telegram
-            await this.notifyUltraTrade('sell', position, pnl);
-            
+            await this.notifyDebugTrade('sell', position, pnl);
             this.positions.delete(tokenAddress);
             
         } catch (error) {
-            console.error('❌ Errore vendita ultra:', error.message);
-            await this.notify(`❌ Errore vendita ultra ${tokenAddress}: ${error.message}`, 'error');
+            console.error('❌ Errore vendita debug:', error.message);
+            await this.notify(`❌ Errore vendita debug ${tokenAddress}: ${error.message}`, 'error');
         }
     }
 
     // =============================================================================
-    // UTILITY METHODS (identici ma aggiornati per v2.3)
+    // UTILITY METHODS
     // =============================================================================
 
     dailyStatsReset() {
@@ -1769,42 +2089,38 @@ Motivo: ${action === 'stop_loss' ? 'Stop Loss' : action === 'take_profit' ? 'Tak
 
     emergencyChecks() {
         setInterval(async () => {
-            // Check perdite eccessive
-            if (this.stats.dailyPnL <= -this.config.ultraPermissive.maxDailyLoss) {
+            if (this.stats.dailyPnL <= -this.config.debugIntensive.maxDailyLoss) {
                 await this.notify(`
-🚨 *ALERT ULTRA: Perdita Massima*
+🚨 *ALERT DEBUG: Perdita Massima*
 P&L Oggi: ${this.stats.dailyPnL.toFixed(4)} TON
-Limite: -${this.config.ultraPermissive.maxDailyLoss} TON
+Limite: -${this.config.debugIntensive.maxDailyLoss} TON
 
-Trading ultra sospeso per oggi.
+Trading debug sospeso per oggi.
                 `, 'warning');
             }
             
-            // Check balance basso
             const currentBalance = await this.getWalletBalance();
-            if (currentBalance < this.config.ultraPermissive.minStartBalance) {
+            if (currentBalance < this.config.debugIntensive.minStartBalance) {
                 await this.notify(`
-⚠️ *ALERT ULTRA: Balance Insufficiente*
+⚠️ *ALERT DEBUG: Balance Insufficiente*
 Balance attuale: ${currentBalance.toFixed(4)} TON
-Minimo richiesto: ${this.config.ultraPermissive.minStartBalance} TON
+Minimo richiesto: ${this.config.debugIntensive.minStartBalance} TON
 
 Invia TON a: \`${this.walletAddress}\`
                 `, 'warning');
             }
-        }, 10 * 60 * 1000); // Ogni 10 minuti (più frequente)
+        }, 15 * 60 * 1000); // Ogni 15 minuti
     }
 
     scheduleDailyReport() {
-        // Report ogni 12 ore invece di 24
         setInterval(async () => {
             await this.notifyDailyReport();
         }, 12 * 60 * 60 * 1000);
         
-        // Report ogni 2 ore se ci sono posizioni
         setInterval(async () => {
-            if (this.positions.size > 0) {
+            if (this.positions.size > 0 || this.scanCount % 20 === 0) {
                 await this.notify(`
-📊 *Update ULTRA v2.3* (${this.positions.size} posizioni)
+📊 *Update DEBUG v2.4* (${this.positions.size} posizioni)
 P&L Oggi: ${this.stats.dailyPnL > 0 ? '+' : ''}${this.stats.dailyPnL.toFixed(4)} TON
 Scansioni: ${this.scanCount}
 🔍 Token analizzati: ${this.tokensAnalyzed}
@@ -1812,7 +2128,7 @@ Scansioni: ${this.scanCount}
 ✅ Approvati: ${this.filterResults.approved}
                 `, 'info', true);
             }
-        }, 2 * 60 * 60 * 1000);
+        }, 3 * 60 * 60 * 1000); // Ogni 3 ore
     }
 
     async notifyDailyReport() {
@@ -1820,7 +2136,7 @@ Scansioni: ${this.scanCount}
         const winRate = this.getWinRate();
         
         const message = `
-📊 *REPORT ULTRA PERMISSIVO v2.3*
+📊 *REPORT DEBUG v2.4*
 
 💳 Wallet: \`${this.walletAddress}\`
 💰 Balance: ${balance.toFixed(4)} TON
@@ -1832,13 +2148,13 @@ Scansioni: ${this.scanCount}
 🎯 Candidati trovati: ${this.candidatesFound}
 ✅ Approvati: ${this.filterResults.approved}
 
-📈 *Performance Filtri:*
+📈 *Performance Debug:*
 • Success rate: ${this.scanCount > 0 ? ((this.candidatesFound / this.scanCount) * 100).toFixed(1) : 0}%
 • Approval rate: ${this.candidatesFound > 0 ? ((this.filterResults.approved / this.candidatesFound) * 100).toFixed(1) : 0}%
 
 🔗 Webhook: ${this.webhookConfigured ? '✅' : '📱'}
 
-🚀 ${this.stats.dailyPnL > 0 ? 'ULTRA SUCCESS!' : this.stats.dailyPnL < -0.05 ? '⚠️ Ultra Loss' : '😐 Neutro'}
+🔍 ${this.stats.dailyPnL > 0 ? 'DEBUG SUCCESS!' : this.stats.dailyPnL < -0.05 ? '⚠️ Debug Loss' : '😐 Neutro'}
         `.trim();
         
         await this.notify(message, this.stats.dailyPnL > 0 ? 'profit' : 'info');
@@ -1851,13 +2167,12 @@ Scansioni: ${this.scanCount}
             console.log(`💰 Rilevato nuovo deposito: ${this.stats.startBalance.toFixed(4)} → ${balance.toFixed(4)} TON`);
             this.stats.startBalance = balance;
             
-            await this.notify(`💰 Nuovo deposito rilevato!\nBalance aggiornato: ${balance.toFixed(4)} TON\n🚀 Trading ultra ora attivo`, 'success');
+            await this.notify(`💰 Nuovo deposito rilevato!\nBalance aggiornato: ${balance.toFixed(4)} TON\n🔍 Trading debug ora attivo`, 'success');
         }
         
-        console.log(`📊 Stats v2.3: ${this.stats.totalTrades} trades | Balance: ${balance.toFixed(4)} TON | P&L: ${this.stats.totalPnL.toFixed(4)} TON | Win Rate: ${this.getWinRate()}% | Analizzati: ${this.tokensAnalyzed} | Candidati: ${this.candidatesFound}`);
+        console.log(`📊 Stats v2.4: ${this.stats.totalTrades} trades | Balance: ${balance.toFixed(4)} TON | P&L: ${this.stats.totalPnL.toFixed(4)} TON | Win Rate: ${this.getWinRate()}% | Analizzati: ${this.tokensAnalyzed} | Candidati: ${this.candidatesFound}`);
     }
 
-    // Utility methods identici
     async getWalletBalance() {
         if (!this.wallet) return this.stats.startBalance;
         
@@ -1876,8 +2191,8 @@ Scansioni: ${this.scanCount}
     
     stop() {
         this.isRunning = false;
-        console.log('🛑 Ultra Permissive Bot v2.3 fermato');
-        this.notify('🛑 Bot ultra v2.3 fermato', 'info');
+        console.log('🛑 Debug Intensivo Bot v2.4 fermato');
+        this.notify('🛑 Bot debug v2.4 fermato', 'info');
     }
 
     getUptime() {
@@ -1918,72 +2233,71 @@ Scansioni: ${this.scanCount}
 }
 
 // =============================================================================
-// CONFIGURAZIONE ULTRA PERMISSIVA v2.3
+// CONFIGURAZIONE DEBUG INTENSIVO v2.4
 // =============================================================================
 
-const ultraPermissiveConfig = {
+const debugIntensiveConfig = {
     endpoint: process.env.TON_ENDPOINT || 'https://toncenter.com/api/v2/jsonRPC',
     
-    ultraPermissive: {
-        // TRADING PARAMETERS ULTRA PERMISSIVI
-        maxTradeSize: parseFloat(process.env.MAX_TRADE_SIZE) || 0.3,  // Aumentato da 0.2
-        maxPositions: parseInt(process.env.MAX_POSITIONS) || 5,        // Aumentato da 3
-        minStartBalance: parseFloat(process.env.MIN_START_BALANCE) || 0.3, // Ridotto da 0.5
-        maxDailyLoss: parseFloat(process.env.MAX_DAILY_LOSS) || 0.5,   // Aumentato
+    debugIntensive: {
+        // TRADING PARAMETERS PERMISSIVI PER DEBUG
+        maxTradeSize: parseFloat(process.env.MAX_TRADE_SIZE) || 0.15,
+        maxPositions: parseInt(process.env.MAX_POSITIONS) || 3,
+        minStartBalance: parseFloat(process.env.MIN_START_BALANCE) || 0.2,
+        maxDailyLoss: parseFloat(process.env.MAX_DAILY_LOSS) || 0.4,
         
-        // EXIT STRATEGY ULTRA AGGRESSIVA
-        stopLossPercent: parseFloat(process.env.STOP_LOSS_PERCENT) || -8,  // Più ampio
-        takeProfitPercent: parseFloat(process.env.TAKE_PROFIT_PERCENT) || 12, // Più ampio
-        maxHoldTime: parseInt(process.env.MAX_HOLD_TIME) || 5400000, // 1.5 ore
+        // EXIT STRATEGY
+        stopLossPercent: parseFloat(process.env.STOP_LOSS_PERCENT) || -6,
+        takeProfitPercent: parseFloat(process.env.TAKE_PROFIT_PERCENT) || 10,
+        maxHoldTime: parseInt(process.env.MAX_HOLD_TIME) || 3600000, // 1 ora
         
-        // FILTRI ULTRA MINIMI
-        minConfidenceScore: parseFloat(process.env.MIN_CONFIDENCE_SCORE) || 25, // Era 45!
-        minLiquidity: parseFloat(process.env.MIN_LIQUIDITY) || 5,   // Era 25! RIDICOLO
-        minTokenAge: parseInt(process.env.MIN_TOKEN_AGE) || 180,    // Era 300 (3min)
-        maxTokenAge: parseInt(process.env.MAX_TOKEN_AGE) || 2592000, // Era 1209600 (30gg)
+        // FILTRI PERMISSIVI PER DEBUG
+        minConfidenceScore: parseFloat(process.env.MIN_CONFIDENCE_SCORE) || 30, // Basso per debug
+        minLiquidity: parseFloat(process.env.MIN_LIQUIDITY) || 2,   // Bassissimo
+        minTokenAge: parseInt(process.env.MIN_TOKEN_AGE) || 300000,  // 5 min
+        maxTokenAge: parseInt(process.env.MAX_TOKEN_AGE) || 7776000000, // 90 giorni
         
-        // KEYWORDS MEGA AMPLIATE
-        strongKeywords: (process.env.STRONG_KEYWORDS || 'doge,pepe,shiba,moon,rocket,gem,safe,baby,mini,meta,ton,coin,token,defi,yield,stake,farm,blum,elon,mars,lambo,hodl,diamond,pump,bull,green,gold,star,fire,thunder,lightning,ice,snow,cat,dog,frog,fish,bird,bear,panda,tiger,lion,king,queen,prince,royal,magic,wizard,knight,hero,legend,epic,ultra,mega,super,hyper,turbo,fast,quick,speed,jet,sonic,flash,blast,boom,bang,pop,splash,wave,ocean,sea,beach,island,treasure,chest,vault,bank,rich,wealth,fortune,lucky,winner,champion,master,elite,alpha,beta,gamma,delta,omega,nova,star,comet,planet,space,cosmic,galaxy,universe,infinity,eternal,divine,sacred,holy,angel,demon,dragon,phoenix,unicorn,rainbow,crystal,pearl,ruby,emerald,sapphire,platinum,silver,bronze,copper,iron,steel,titanium,carbon,neon,laser,plasma,quantum,atomic,nuclear,fusion,energy,power,force,strength,might,fury,rage,storm,cyclone,tornado,hurricane,tsunami,earthquake,volcano,lava,magma,fire,flame,blaze,inferno,freeze,frost,winter,summer,spring,autumn,day,night,dawn,dusk,sunrise,sunset,twilight,midnight,noon,morning,evening,time,clock,hour,minute,second,year,month,week,future,past,present,now,today,tomorrow,yesterday,forever,always,never,maybe,perhaps,possible,impossible,dream,hope,wish,desire,love,hate,peace,war,battle,fight,victory,defeat,win,lose,success,failure,up,down,left,right,forward,backward,inside,outside,over,under,above,below,between,among,within,without,before,after,during,while,since,until,because,therefore,however,although,unless,except,besides,instead,otherwise,meanwhile,furthermore,moreover,nevertheless,nonetheless,consequently,accordingly,similarly,likewise,contrary,opposite,different,same,equal,unequal,big,small,large,tiny,huge,giant,mini,micro,macro,mega,giga,tera,kilo,milli,nano,pico,zero,one,two,three,four,five,six,seven,eight,nine,ten,hundred,thousand,million,billion,trillion,first,second,third,last,final,initial,beginning,end,start,finish,complete,incomplete,full,empty,solid,liquid,gas,hot,cold,warm,cool,dry,wet,clean,dirty,new,old,young,fresh,stale,sharp,dull,bright,dark,light,heavy,soft,hard,smooth,rough,round,square,circle,triangle,rectangle,oval,line,curve,straight,crooked,thick,thin,wide,narrow,tall,short,deep,shallow,high,low,far,near,close,distant,here,there,everywhere,nowhere,somewhere,anywhere,home,away,in,out,on,off,up,down').split(','),
+        // KEYWORDS RIDOTTE PER TEST
+        strongKeywords: (process.env.STRONG_KEYWORDS || 'doge,pepe,shiba,moon,rocket,gem,safe,baby,mini,meta,ton,coin,token,defi,yield,stake,farm,blum,elon,mars,lambo,hodl,diamond,pump,bull,green,gold,star,fire,cat,dog,king,fast,speed,jet,flash,super,mega,ultra,alpha,beta,omega,crypto,chain,block,smart,auto,quick,rapid,turbo,boost,power,energy,force,magic,lucky,winner,rich,wealth,bank,vault,treasure,island,ocean,sea,wave,storm,thunder,lightning,ice,snow,winter,summer,sun,bright,light,dark,shadow,time,space,planet,star,moon,earth,mars,jupiter,neptune,venus,saturn,mercury,pluto').split(','),
         
-        scanInterval: parseInt(process.env.SCAN_INTERVAL) || 20000, // Era 30000 (20s)
-        sizeMultiplier: parseFloat(process.env.SIZE_MULTIPLIER) || 0.8, // Più aggressivo
+        scanInterval: parseInt(process.env.SCAN_INTERVAL) || 30000, // 30 secondi
     }
 };
 
 // =============================================================================
-// AVVIO AUTOMATICO BOT v2.3 ULTRA PERMISSIVO
+// AVVIO AUTOMATICO BOT v2.4 DEBUG INTENSIVO
 // =============================================================================
 
-console.log('🚀 Inizializzazione TON ULTRA PERMISSIVE Bot v2.3 su Render...');
-console.log('🔧 Novità ULTRA v2.3:');
-console.log('   🚀 Confidence minimo: 25% (ERA 45%!)');
-console.log('   🚀 Liquidità minima: $5 (ERA $25!)');
-console.log('   🚀 Keywords: 200+ parole monitorate');
-console.log('   🚀 Scansioni: ogni 20 secondi');
-console.log('   🚀 Max posizioni: 5 contemporanee');
-console.log('   🚀 Age range: 3min-30giorni');
-console.log('   🚀 Debug completo e trasparente');
-console.log('   🚀 PROVA TUTTO quello che non è chiaramente scam!');
+console.log('🚀 Inizializzazione TON DEBUG INTENSIVO Bot v2.4 su Render...');
+console.log('🔧 Novità DEBUG v2.4:');
+console.log('   🔍 Debug completo di ogni step');
+console.log('   📊 Mostra perché i token vengono rifiutati');
+console.log('   🎯 Confidence minimo: 30% (per test)');
+console.log('   💧 Liquidità minima: $2 (per test)');
+console.log('   ⏰ Age range: 5min-90giorni (ampio)');
+console.log('   🔧 Comandi /intensive, /api, /scan');
+console.log('   📱 Notifiche debug dettagliate');
+console.log('   🔍 TROVA IL PROBLEMA dei 0 token!');
 
 setTimeout(async () => {
     try {
-        bot = new UltraPermissiveTONBot(ultraPermissiveConfig);
+        bot = new DebugIntensiveTONBot(debugIntensiveConfig);
         
         await bot.start();
         
-        console.log('✅ Bot ULTRA PERMISSIVO v2.3 avviato con successo su Render!');
+        console.log('✅ Bot DEBUG INTENSIVO v2.4 avviato con successo su Render!');
         console.log(`🌐 Server disponibile su porta ${PORT}`);
         console.log('🔗 Test webhook: https://bot-trading-conservativo.onrender.com/webhook/test');
         console.log('📊 Debug info: https://bot-trading-conservativo.onrender.com/stats');
         
     } catch (error) {
-        console.error('❌ Errore avvio bot ultra v2.3:', error);
+        console.error('❌ Errore avvio bot debug v2.4:', error);
         
         if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
             try {
                 const errorBot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: false });
                 await errorBot.sendMessage(process.env.TELEGRAM_CHAT_ID, 
-                    `❌ Errore avvio bot ULTRA v2.3 su Render:\n${error.message}\n\nControlla i logs su Render dashboard.`);
+                    `❌ Errore avvio bot DEBUG v2.4 su Render:\n${error.message}\n\nControlla i logs su Render dashboard.`);
             } catch (telegramError) {
                 console.error('❌ Errore notifica Telegram:', telegramError);
             }
@@ -1996,11 +2310,11 @@ setTimeout(async () => {
 // =============================================================================
 
 process.on('SIGINT', () => {
-    console.log('\n🛑 Ricevuto SIGINT, fermando bot ultra v2.3...');
+    console.log('\n🛑 Ricevuto SIGINT, fermando bot debug v2.4...');
     if (bot) {
         bot.stop();
         if (bot.telegram) {
-            bot.notify('🛑 Bot ultra v2.3 fermato da SIGINT (restart server)', 'warning').catch(() => {});
+            bot.notify('🛑 Bot debug v2.4 fermato da SIGINT (restart server)', 'warning').catch(() => {});
         }
     }
     server.close(() => {
@@ -2010,11 +2324,11 @@ process.on('SIGINT', () => {
 });
 
 process.on('SIGTERM', () => {
-    console.log('\n🛑 Ricevuto SIGTERM, fermando bot ultra v2.3...');
+    console.log('\n🛑 Ricevuto SIGTERM, fermando bot debug v2.4...');
     if (bot) {
         bot.stop();
         if (bot.telegram) {
-            bot.notify('🛑 Bot ultra v2.3 fermato da SIGTERM (deploy/restart)', 'warning').catch(() => {});
+            bot.notify('🛑 Bot debug v2.4 fermato da SIGTERM (deploy/restart)', 'warning').catch(() => {});
         }
     }
     server.close(() => {
@@ -2026,14 +2340,14 @@ process.on('SIGTERM', () => {
 process.on('uncaughtException', (error) => {
     console.error('❌ Uncaught Exception:', error);
     if (bot && bot.telegram) {
-        bot.notify(`❌ Errore critico ultra v2.3: ${error.message}`, 'error').catch(() => {});
+        bot.notify(`❌ Errore critico debug v2.4: ${error.message}`, 'error').catch(() => {});
     }
 });
 
 process.on('unhandledRejection', (reason, promise) => {
     console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
     if (bot && bot.telegram) {
-        bot.notify(`❌ Promise rejection ultra v2.3: ${reason}`, 'error').catch(() => {});
+        bot.notify(`❌ Promise rejection debug v2.4: ${reason}`, 'error').catch(() => {});
     }
 });
 
@@ -2041,38 +2355,32 @@ process.on('unhandledRejection', (reason, promise) => {
 // EXPORT MODULE
 // =============================================================================
 
-module.exports = { UltraPermissiveTONBot, ultraPermissiveConfig };
+module.exports = { DebugIntensiveTONBot, debugIntensiveConfig };
 
 // =============================================================================
-// ISTRUZIONI SETUP ULTRA PERMISSIVO v2.3
+// ISTRUZIONI SETUP DEBUG v2.4
 // =============================================================================
 
-console.log('\n🚀 SETUP ULTRA PERMISSIVO v2.3:');
-console.log('========================================');
-console.log('📋 1. Sostituisci bot.js con questo codice ULTRA');
-console.log('🔑 2. Aggiorna variabili ambiente su Render:');
-console.log('   MIN_CONFIDENCE_SCORE=25  (ERA 45!)');
-console.log('   MIN_LIQUIDITY=5  (ERA 25!)');
-console.log('   MIN_TOKEN_AGE=180  (3 min)');
-console.log('   MAX_TOKEN_AGE=2592000  (30 giorni)');
-console.log('   MAX_TRADE_SIZE=0.3  (aumentato)');
-console.log('   MAX_POSITIONS=5  (aumentato)');
-console.log('   SCAN_INTERVAL=20000  (20s)');
-console.log('   MIN_START_BALANCE=0.3  (ridotto)');
-console.log('   MAX_DAILY_LOSS=0.5  (aumentato)');
-console.log('   STOP_LOSS_PERCENT=-8  (più ampio)');
-console.log('   TAKE_PROFIT_PERCENT=12  (più ampio)');
+console.log('\n🔍 SETUP DEBUG INTENSIVO v2.4:');
+console.log('==========================================');
+console.log('📋 1. Sostituisci bot.js con questo codice DEBUG');
+console.log('🔑 2. Le variabili ambiente sono già ottimizzate');
 console.log('🚀 3. Deploy su Render');
-console.log('📱 4. Testa: /test, /debug, /scan, /filters');
+console.log('📱 4. Comandi debug disponibili:');
+console.log('   /intensive - Debug completo API + filtri');
+console.log('   /api - Test rapido solo API');
+console.log('   /scan - Scansione manuale');
+console.log('   /debug - Info contatori');
+console.log('   /filters - Performance filtri');
 console.log('');
-console.log('✨ RISULTATI ATTESI ULTRA:');
-console.log('• 50-100x più token candidati!');
-console.log('• Token con liquidità da $5 in su');
-console.log('• Confidence da 25% in su');
-console.log('• Debug completo di ogni scansione');
-console.log('• Notifiche dettagliate per ogni decisione');
-console.log('• Scansioni ogni 20 secondi');
-console.log('• MASSIMA probabilità di trovare opportunità');
-console.log('========================================');
-console.log('⚠️  ATTENZIONE: ULTRA PERMISSIVO = ULTRA RISCHIO!');
-console.log('🚀 Questo bot testa TUTTO quello che non è ovviamente scam!');
+console.log('✨ COSA FARÀ IL DEBUG:');
+console.log('• Mostra ESATTAMENTE perché trova 0 pool');
+console.log('• Debug step-by-step di ogni filtro');
+console.log('• Test API separati');
+console.log('• Età token mostrata in ore/giorni');
+console.log('• Keywords match dettagliate');
+console.log('• Liquidità check con soglie bassissime');
+console.log('• Logs completi di ogni scansione');
+console.log('==========================================');
+console.log('🎯 OBIETTIVO: Trovare il VERO problema!');
+console.log('🔧 Usa /intensive per diagnosi completa!');
