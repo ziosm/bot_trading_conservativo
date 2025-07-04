@@ -2535,7 +2535,6 @@ module.exports = { FixedPoolDetectionTONBot, fixedConfig };
 // =============================================================================
 // ISTRUZIONI SETUP v2.4.1 FIXED
 // =============================================================================
-
 console.log('\n🔧 SETUP BOT v2.4.1 FIXED:');
 console.log('==========================================');
 console.log('📋 1. Sostituisci bot.js con questo codice FIXED');
@@ -2543,4 +2542,18 @@ console.log('🔑 2. Le variabili ambiente sono già ottimizzate');
 console.log('🚀 3. Deploy su Render');
 console.log('📱 4. Comandi FIXED disponibili:');
 console.log('   /intensive - Debug completo con FIX');
-console.log('   /api - Test API con
+console.log('   /api - Test API con detection FIXED');
+console.log('   /scan - Scansione manuale FIXED');
+console.log('   /fix - Info sui fix implementati');
+console.log('   /debug - Info contatori con fix status');
+console.log('');
+console.log('✨ COSA FA IL FIX v2.4.1:');
+console.log('• DeDust: Cerca left_asset.type="native" per TON');
+console.log('• STON.fi: Cerca token0_symbol/token1_symbol="TON"');
+console.log('• Debug: Mostra struttura completa dei pool');
+console.log('• API: Gestione corretta di tutti i field');
+console.log('• Detection: Riconosce TON nativo e WTON');
+console.log('• Logs: Debug intensivo di ogni step');
+console.log('==========================================');
+console.log('🎯 OBIETTIVO: Pool TON finalmente trovati!');
+console.log('🔧 Usa /intensive per vedere il fix in azione!');
