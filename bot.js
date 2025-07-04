@@ -17,7 +17,7 @@ app.use(express.json());
 let bot = null;
 
 // =============================================================================
-// WEBHOOK TELEGRAM SETUP (identico)
+// WEBHOOK TELEGRAM SETUP
 // =============================================================================
 
 app.use('/webhook', express.json());
@@ -135,7 +135,7 @@ app.get('/bot/stop', (req, res) => {
     }
 });
 
-// Avvia server Express IMMEDIATAMENTE
+// Avvia server Express
 const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`🎯 Server v2.4.3 FINALE running on port ${PORT}`);
     console.log(`🔗 Health check: http://localhost:${PORT}/health`);
@@ -434,7 +434,7 @@ class FinalTONBot {
     }
 
     // =============================================================================
-    // NUOVI METODI CON PATCH v2.4.3 APPLICATE
+    // COMANDI TELEGRAM
     // =============================================================================
 
     async handleStartCommand(chatId) {
@@ -472,7 +472,7 @@ class FinalTONBot {
         this.lastEmergencyDebug = new Date().toISOString();
         
         try {
-            console.log('\n🎯🎯🎯 ANALISI COMPLETA v2.4.3 FINALE INIZIATA 🎯🎯🎯');
+            console.log('\n🎯 ANALISI COMPLETA v2.4.3 FINALE INIZIATA');
             console.log('='.repeat(60));
             
             // Reset contatori
@@ -716,14 +716,14 @@ Ora il bot dovrebbe trovare MOLTI più token validi!
                             address: pool.right_asset.address || '',
                             symbol: pool.right_asset.metadata.symbol || 'UNK',
                             name: pool.right_asset.metadata.name || 'Unknown',
-                            liquidity: this.calculatePoolLiquidity(pool) // NUOVO: calcola liquidità
+                            liquidity: this.calculatePoolLiquidity(pool)
                         };
                     } else if (rightIsNative && pool.left_asset.metadata) {
                         tokenData = {
                             address: pool.left_asset.address || '',
                             symbol: pool.left_asset.metadata.symbol || 'UNK',
                             name: pool.left_asset.metadata.name || 'Unknown',
-                            liquidity: this.calculatePoolLiquidity(pool) // NUOVO: calcola liquidità
+                            liquidity: this.calculatePoolLiquidity(pool)
                         };
                     }
                 }
@@ -856,6 +856,463 @@ Ora il bot dovrebbe trovare MOLTI più token validi!
 
     // PATCH v2.4.3: NUOVO METODO CALCOLO LIQUIDITÀ
     calculatePoolLiquidity(pool) {
+        try {
+            // Cerca nelle stats o nei reserves
+            if (pool.stats && pool.stats.volume && Array.isArray(pool.stats.volume)) {
+                const volume = pool.stats.volume.reduce((sum, vol) => sum + parseFloat(vol || 0), 0);
+                if (volume > 0) return volume * 10; // Stima liquidità da volume
+            }
+            
+            // Fallback: usa reserves se disponibili
+            if (pool.reserves && Array.isArray(pool.reserves)) {
+                const reserves = pool.reserves.reduce((sum, res) => sum + parseFloat(res || 0), 0);
+                if (reserves > 0) return reserves / 1000000; // Converte da nano
+            }
+            
+            // Default: assegna valore minimo per pool attivi
+            return pool.totalSupply && parseFloat(pool.totalSupply) > 0 ? 5 : 0;
+            
+        } catch (error) {
+            return 0;
+        }
+    }
+
+    // PATCH v2.4.3: NUOVO METODO CALCOLO VOLUME
+    calculatePoolVolume(pool) {
+        try {
+            if (pool.stats && pool.stats.volume && Array.isArray(pool.stats.volume)) {
+                return pool.stats.volume.reduce((sum, vol) => sum + parseFloat(vol || 0), 0);
+            }
+            return 0;
+        } catch (error) {
+            return 0;
+        }
+    }
+
+    // PATCH v2.4.3: FILTRI INTELLIGENTI CON RESET BLACKLIST
+    passesFiltersDebug(token) {
+        const filters = this.config.finaleOptimized;
+        
+        console.log(`\n🎯 FILTRI v2.4.3 FINALE per ${token.name} (${token.symbol}):`);
+        this.filterResults.totalScanned++;
+        
+        // NUOVO: Reset blacklist ogni 10 scansioni per dare seconde possibilità
+        if (this.scanCount % 10 === 0 && this.tokenBlacklist.size > 50) {
+            const oldSize = this.tokenBlacklist.size;
+            this.tokenBlacklist.clear();
+            console.log(`   🔄 RESET BLACKLIST: ${oldSize} token rimossi per dare seconde possibilità`);
+        }
+        
+        // 1. BLACKLIST (ora più permissiva)
+        if (this.tokenBlacklist.has(token.address)) {
+            console.log(`   ❌ FALLITO: Token in blacklist`);
+            this.filterResults.failedScam++;
+            return false;
+        }
+        console.log(`   ✅ PASSATO: Non in blacklist`);
+        
+        // 2. SCAM CHECK (ora più permissivo)
+        if (this.isObviousScamTokenImproved(token)) {
+            console.log(`   ❌ FALLITO: Scam ovvio rilevato`);
+            this.tokenBlacklist.add(token.address);
+            this.filterResults.failedScam++;
+            return false;
+        }
+        console.log(`   ✅ PASSATO: Non è scam ovvio`);
+        
+        // 3. LIQUIDITÀ (soglia più bassa)
+        const minLiquidity = Math.min(filters.minLiquidity, 1); // Minimo $1
+        if (token.liquidity < minLiquidity) {
+            console.log(`   ❌ FALLITO: Liquidità ${token.liquidity} < ${minLiquidity}`);
+            this.filterResults.failedLiquidity++;
+            return false;
+        }
+        console.log(`   ✅ PASSATO: Liquidità ${token.liquidity} >= ${minLiquidity}`);
+        
+        // 4. ETÀ (più permissivo)
+        const tokenAge = Date.now() - (token.createdAt || Date.now() - 3600000);
+        const minAge = Math.min(filters.minTokenAge, 60000); // Minimo 1 minuto
+        const maxAge = Math.max(filters.maxTokenAge, 86400000 * 365); // Massimo 1 anno
+        
+        const ageMinutes = tokenAge / (1000 * 60);
+        const ageHours = tokenAge / (1000 * 60 * 60);
+        const ageDays = tokenAge / (1000 * 60 * 60 * 24);
+        
+        console.log(`   🕐 Token age: ${ageMinutes.toFixed(1)} min (${ageHours.toFixed(1)} ore, ${ageDays.toFixed(1)} giorni)`);
+        
+        if (tokenAge < minAge) {
+            console.log(`   ❌ FALLITO: Troppo nuovo ${ageMinutes.toFixed(1)} min < ${(minAge / (1000 * 60)).toFixed(1)} min`);
+            this.filterResults.failedAge++;
+            return false;
+        }
+        
+        if (tokenAge > maxAge) {
+            console.log(`   ❌ FALLITO: Troppo vecchio ${ageDays.toFixed(1)} giorni > ${(maxAge / (1000 * 60 * 60 * 24)).toFixed(1)} giorni`);
+            this.filterResults.failedAge++;
+            return false;
+        }
+        console.log(`   ✅ PASSATO: Età valida`);
+        
+        // 5. KEYWORDS (più permissivo)
+        const tokenText = `${token.name} ${token.symbol}`.toLowerCase();
+        console.log(`   🔤 Testo da analizzare: "${tokenText}"`);
+        
+        // NUOVO: Keywords più ampie
+        const extendedKeywords = [
+            ...filters.strongKeywords,
+            'new', 'hot', 'launch', 'trade', 'swap', 'bridge', 'yield', 'pool', 'farm',
+            'ai', 'btc', 'eth', 'sol', 'ton', 'usdt', 'usdc', 'dao', 'nft', 'game',
+            'meme', 'dog', 'cat', 'inu', 'elon', 'trump', 'biden', 'x', 'twitter'
+        ];
+        
+        const matchedKeywords = [];
+        for (const keyword of extendedKeywords) {
+            if (tokenText.includes(keyword.toLowerCase())) {
+                matchedKeywords.push(keyword);
+            }
+        }
+        
+        console.log(`   🎯 Keywords trovate: [${matchedKeywords.join(', ')}]`);
+        
+        if (matchedKeywords.length === 0) {
+            console.log(`   ❌ FALLITO: Nessuna keyword trovata`);
+            this.filterResults.failedKeywords++;
+            return false;
+        }
+        
+        console.log(`   ✅ PASSATO: ${matchedKeywords.length} keywords trovate!`);
+        
+        this.filterResults.passedBasic++;
+        console.log(`   🎉 TOKEN APPROVATO v2.4.3: ${token.symbol} supera tutti i filtri!`);
+        return true;
+    }
+
+    // PATCH v2.4.3: ANTI-SCAM MIGLIORATO
+    isObviousScamTokenImproved(token) {
+        const name = token.name.toLowerCase();
+        const symbol = token.symbol.toLowerCase();
+        const combined = `${name} ${symbol}`;
+        
+        // SOLO i più ovvi e pericolosi
+        const obviousScamPatterns = [
+            /^test$/i, /^fake$/i, /^scam$/i, /^rug$/i,
+            /^[a-f0-9]{40,}$/i,  // Solo hash lunghi
+            /^[0-9]{10,}$/,     // Solo numeri lunghi
+            /(.)\1{8,}/,        // Troppi caratteri ripetuti (8+ invece di 6+)
+            /^.{1,2}$/,         // Solo 1-2 caratteri
+            /^.{150,}$/,        // Troppo lungo (150+ invece di 100+)
+            /fuck|shit|xxx|sex|porn|scam|rug|fake|test123/i,
+            /^(bitcoin|btc|ethereum|eth|usdt|usdc|bnb|ada|sol)$/i // Solo imitazioni perfette
+        ];
+        
+        for (const pattern of obviousScamPatterns) {
+            if (pattern.test(combined)) {
+                console.log(`   🚨 Scam OVVIO: ${pattern} in "${combined}"`);
+                return true;
+            }
+        }
+        
+        // NUOVO: Non bloccare per liquidità 0 (è normale per pool nuovi)
+        if (token.liquidity < 0) { // Solo liquidità negativa (impossibile)
+            console.log(`   🚨 Liquidità impossibile: ${token.liquidity}`);
+            return true;
+        }
+        
+        return false;
+    }
+
+    // =============================================================================
+    // WALLET INITIALIZATION
+    // =============================================================================
+
+    async debugWalletAddresses(mnemonic) {
+        console.log('🔍 DEBUG: Analisi wallet addresses v2.4.3...');
+        
+        try {
+            const yourWallet = 'UQBdflvdcISFuWFWvdXlonQObvfBUFOBpML3Loxsjp5tVbw0';
+            console.log('📍 Target wallet: ', yourWallet);
+            
+            const keyPair = await mnemonicToPrivateKey(mnemonic);
+            const wallet = WalletContractV4.create({ 
+                publicKey: keyPair.publicKey, 
+                workchain: 0 
+            });
+            
+            const address = wallet.address;
+            const generated = address.toString({ bounceable: false });
+            const isMatch = yourWallet === generated;
+            
+            console.log('\n🎯 VERIFICA v2.4.3:');
+            console.log('Target:      ', yourWallet);
+            console.log('Generato:    ', generated);
+            console.log('Match?       ', isMatch ? '✅ SÌ' : '❌ NO');
+            
+            return { isMatch, generated, target: yourWallet };
+            
+        } catch (error) {
+            console.error('❌ Errore debug wallet:', error.message);
+            return { isMatch: false, error: error.message };
+        }
+    }
+
+    async initialize() {
+        try {
+            console.log('🔑 Inizializzazione wallet v2.4.3 FINALE...');
+            
+            const mnemonicString = process.env.MNEMONIC_WORDS;
+            
+            if (!mnemonicString) {
+                throw new Error('MNEMONIC_WORDS non configurato nelle variabili ambiente');
+            }
+            
+            const mnemonic = mnemonicString.split(',').map(word => word.trim());
+            
+            if (mnemonic.length !== 24) {
+                throw new Error(`Mnemonic deve avere 24 parole, ricevute: ${mnemonic.length}`);
+            }
+            
+            console.log('✅ Mnemonic parsate: 24 parole');
+            
+            const debugResult = await this.debugWalletAddresses(mnemonic);
+            
+            if (!debugResult.isMatch) {
+                console.warn('⚠️ WARNING: Wallet generato non corrisponde al target');
+                await this.notify(`⚠️ WALLET MISMATCH!\nTarget: ${debugResult.target}\nGenerato: ${debugResult.generated}\nVerifica MNEMONIC_WORDS!`, 'warning');
+            }
+            
+            const keyPair = await mnemonicToPrivateKey(mnemonic);
+            this.wallet = WalletContractV4.create({ 
+                publicKey: keyPair.publicKey, 
+                workchain: 0 
+            });
+            
+            this.walletAddress = this.wallet.address.toString({ bounceable: false });
+            
+            const contract = this.client.open(this.wallet);
+            const balance = await contract.getBalance();
+            this.stats.startBalance = Number(balance) / 1000000000;
+            
+            console.log('🏦 TON Wallet inizializzato correttamente');
+            console.log(`📍 Address: ${this.walletAddress}`);
+            console.log(`💰 Balance: ${this.stats.startBalance.toFixed(4)} TON`);
+            
+            await this.notify(`
+🏦 *Wallet Inizializzato v2.4.3 FINALE*
+Address: \`${this.walletAddress}\`
+Balance: ${this.stats.startBalance.toFixed(4)} TON
+Status: ${this.stats.startBalance >= this.config.finaleOptimized.minStartBalance ? '✅ Pronto' : '⚠️ Balance basso'}
+Match: ${debugResult.isMatch ? '✅ Corretto' : '❌ Verifica mnemonic'}
+Webhook: ${this.webhookConfigured ? '✅ Attivo' : '📱 Fallback'}
+🎯 Patch v2.4.3: ✅ APPLICATE
+            `, 'success');
+            
+            return true;
+        } catch (error) {
+            console.error('❌ Errore inizializzazione:', error.message);
+            await this.notify(`❌ Errore inizializzazione wallet: ${error.message}`, 'error');
+            return false;
+        }
+    }
+
+    async start() {
+        console.log('🎯 Bot v2.4.3 FINALE avviato...');
+        
+        if (!await this.initialize()) {
+            console.error('❌ Impossibile inizializzare il bot');
+            return;
+        }
+        
+        this.isRunning = true;
+        this.startTime = Date.now();
+        
+        await this.notify(`
+🎯 *Bot v2.4.3 FINALE Avviato*
+
+💳 Wallet: \`${this.walletAddress}\`
+🔗 Webhook: ${this.webhookConfigured ? '✅ Funzionante' : '📱 Polling fallback'}
+
+📊 *Configurazione v2.4.3:*
+• Confidence: ${this.config.finaleOptimized.minConfidenceScore}%
+• Liquidità: ${this.config.finaleOptimized.minLiquidity}
+• Scansione: ${this.config.finaleOptimized.scanInterval / 1000}s
+• Age range: ${(this.config.finaleOptimized.minTokenAge/1000/60).toFixed(0)}min-${(this.config.finaleOptimized.maxTokenAge/1000/60/60/24).toFixed(0)}gg
+
+🎯 *PATCH v2.4.3 Features:*
+• Mapping fixed & liquidità reale ✅
+• Filtri intelligenti & blacklist reset ✅
+• Keywords estese & soglie adattive ✅
+• Anti-scam migliorato ✅
+
+🔧 Usa /emergency per test completo!
+💡 Usa /patch per info migliorie
+        `, 'startup');
+        
+        // Avvia monitoraggio con PATCH v2.4.3
+        this.mainMonitoring();
+        this.dailyStatsReset();
+        this.emergencyChecks();
+        this.scheduleReports();
+    }
+
+    // =============================================================================
+    // TRADING ENGINE v2.4.3 FINALE
+    // =============================================================================
+
+    async canContinueTrading() {
+        const config = this.config.finaleOptimized;
+        
+        const currentBalance = await this.getWalletBalance();
+        if (currentBalance < config.minStartBalance) {
+            console.log(`❌ Balance insufficiente: ${currentBalance.toFixed(4)} TON < ${config.minStartBalance} TON`);
+            
+            if (this.scanCount % 20 === 0) {
+                await this.notify(`💰 Balance insufficiente per trading\nBalance attuale: ${currentBalance.toFixed(4)} TON\nMinimo richiesto: ${config.minStartBalance} TON`, 'warning', true);
+            }
+            return false;
+        }
+        
+        if (this.stats.dailyPnL <= -config.maxDailyLoss) {
+            console.log(`❌ Perdita giornaliera eccessiva: ${this.stats.dailyPnL.toFixed(4)} TON <= -${config.maxDailyLoss} TON`);
+            return false;
+        }
+        
+        if (this.positions.size >= config.maxPositions) {
+            console.log(`❌ Troppe posizioni aperte: ${this.positions.size} >= ${config.maxPositions}`);
+            return false;
+        }
+        
+        console.log(`✅ Trading consentito - Balance: ${currentBalance.toFixed(4)} TON`);
+        return true;
+    }
+
+    async mainMonitoring() {
+        const scanInterval = this.config.finaleOptimized.scanInterval || 30000;
+        
+        while (this.isRunning) {
+            try {
+                const canTrade = await this.canContinueTrading();
+                
+                if (!canTrade) {
+                    console.log('⏸️ Trading sospeso per limiti di sicurezza');
+                    await this.sleep(scanInterval * 2);
+                    continue;
+                }
+                
+                this.scanCount++;
+                console.log(`\n🎯 FINALE Scan #${this.scanCount} - ${new Date().toLocaleTimeString()} (v2.4.3)`);
+                
+                const qualityTokens = await this.findQualityTokens();
+                this.candidatesFound += qualityTokens.length;
+                
+                if (qualityTokens.length > 0) {
+                    console.log(`   🎯 Trovati ${qualityTokens.length} token candidati (v2.4.3 FINALE)`);
+                    
+                    // Notifica ogni 5 scansioni con risultati
+                    if (this.scanCount % 5 === 0) {
+                        await this.notify(`
+🎯 *FINALE Scan #${this.scanCount}*
+🎯 Candidati: ${qualityTokens.length}
+📊 Total trovati: ${this.candidatesFound}
+📈 Success rate: ${((this.candidatesFound / this.scanCount) * 100).toFixed(1)}%
+✅ Patch v2.4.3: ATTIVE
+                        `, 'debug', true);
+                    }
+                    
+                    for (const token of qualityTokens) {
+                        const stillCanTrade = await this.canContinueTrading();
+                        if (!stillCanTrade) break;
+                        
+                        const analysis = await this.tokenAnalysis(token);
+                        if (analysis.shouldBuy) {
+                            await this.executeBuy(token, analysis);
+                        } else {
+                            console.log(`   📋 ${token.symbol}: ${analysis.rejectionReason}`);
+                        }
+                        
+                        await this.sleep(3000);
+                    }
+                } else {
+                    console.log('   💤 Nessun token candidato trovato');
+                    
+                    // Debug ogni 10 scansioni senza risultati
+                    if (this.scanCount % 10 === 0) {
+                        await this.notify(`
+🎯 *FINALE Debug: Scan #${this.scanCount} - 0 candidati*
+📊 Success rate totale: ${((this.candidatesFound / this.scanCount) * 100).toFixed(1)}%
+
+🔧 Patch v2.4.3 Status:
+• Mapping: ✅ Fixed
+• Filtri: ✅ Intelligenti  
+• Blacklist: ✅ Reset attivo
+• Keywords: ✅ Estese
+
+💡 Usa /emergency per diagnosi completa
+                        `, 'debug', true);
+                    }
+                }
+                
+                await this.updateStats();
+                await this.sleep(scanInterval);
+                
+            } catch (error) {
+                console.error('❌ Errore nel monitoraggio v2.4.3:', error.message);
+                await this.notify(`❌ Errore trading v2.4.3: ${error.message}`, 'error');
+                await this.sleep(scanInterval * 2);
+            }
+        }
+    }
+
+    async findQualityTokens() {
+        const qualityTokens = [];
+        
+        try {
+            for (const dex of this.trustedDEXs) {
+                console.log(`🎯 Scansione ${dex} v2.4.3...`);
+                const tokens = await this.scanDEX(dex);
+                qualityTokens.push(...tokens);
+                this.tokensAnalyzed += tokens.length;
+                console.log(`   📊 ${dex}: ${tokens.length} token candidati trovati (v2.4.3)`);
+            }
+            
+            const filtered = qualityTokens.filter(token => this.passesFiltersDebug(token));
+            
+            return filtered;
+            
+        } catch (error) {
+            console.log('⚠️ Errore ricerca token v2.4.3:', error.message);
+            return [];
+        }
+    }
+
+    async scanDEX(dex) {
+        try {
+            switch (dex) {
+                case 'DeDust':
+                    return await this.scanDeDustFixed();
+                case 'STON.fi':
+                    return await this.scanSTONfiFixed();
+                default:
+                    return [];
+            }
+        } catch (error) {
+            console.log(`⚠️ Errore scansione ${dex} v2.4.3:`, error.message);
+            return [];
+        }
+    }
+
+    async tokenAnalysis(token) {
+        console.log(`🎯 Analisi v2.4.3: ${token.name} (${token.symbol})`);
+        
+        let confidenceScore = 50; // Base per v2.4.3
+        const analysis = {
+            shouldBuy: false,
+            confidenceScore: 0,
+            reasons: [],
+            warnings: [],
+            rejectionReason: '',
+            patchVersion: '2.4.3'
+        };
+        
         try {
             // Analisi liquidità (30% peso)
             const liquidityScore = this.analyzeLiquidityScore(token);
@@ -1158,7 +1615,7 @@ Motivo: ${action === 'stop_loss' ? 'Stop Loss' : action === 'take_profit' ? 'Tak
     }
 
     // =============================================================================
-    // METODI API TEST (con v2.4.3)
+    // API TEST METHODS
     // =============================================================================
 
     async testAPIs(chatId) {
@@ -1252,7 +1709,7 @@ Motivo: ${action === 'stop_loss' ? 'Stop Loss' : action === 'take_profit' ? 'Tak
     }
 
     // =============================================================================
-    // UTILITY METHODS (con v2.4.3 logging)
+    // UTILITY METHODS
     // =============================================================================
 
     dailyStatsReset() {
@@ -1502,80 +1959,6 @@ Testa tutte le patch applicate e mostra il miglioramento!
         await this.telegram.sendMessage(chatId, message, { parse_mode: 'Markdown' });
     }
 
-    // Standard utility methods (identici ma con v2.4.3 logging)
-    sleep(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
-    
-    stop() {
-        this.isRunning = false;
-        console.log('🛑 Bot v2.4.3 FINALE fermato');
-        this.notify('🛑 Bot v2.4.3 FINALE fermato', 'info');
-    }
-
-    getUptime() {
-        if (!this.startTime) return '0s';
-        const uptime = Date.now() - this.startTime;
-        const hours = Math.floor(uptime / (1000 * 60 * 60));
-        const minutes = Math.floor((uptime % (1000 * 60 * 60)) / (1000 * 60));
-        return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
-    }
-
-    getWinRate() {
-        if (this.stats.totalTrades === 0) return 0;
-        return Math.round((this.stats.winningTrades / this.stats.totalTrades) * 100);
-    }
-
-    formatTime(ms) {
-        const seconds = Math.floor(ms / 1000);
-        const minutes = Math.floor(seconds / 60);
-        const hours = Math.floor(minutes / 60);
-        
-        if (hours > 0) return `${hours}h ${minutes % 60}m`;
-        if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
-        return `${seconds}s`;
-    }
-
-    // Common notification method
-    async notify(message, type = 'info', silent = false) {
-        console.log(`📱 ${message}`);
-        
-        if (!this.telegram || !this.telegramChatId) return;
-        
-        try {
-            let emoji = '';
-            switch (type) {
-                case 'trade': emoji = '💰'; break;
-                case 'profit': emoji = '📈'; break;
-                case 'loss': emoji = '📉'; break;
-                case 'warning': emoji = '⚠️'; break;
-                case 'error': emoji = '❌'; break;
-                case 'success': emoji = '✅'; break;
-                case 'startup': emoji = '🎯'; break;
-                case 'scam': emoji = '🛡️'; break;
-                case 'debug': emoji = '🔬'; break;
-                case 'finale': emoji = '🎯'; break;
-                default: emoji = 'ℹ️';
-            }
-            
-            const timestamp = new Date().toLocaleTimeString('it-IT');
-            const fullMessage = `${emoji} *[${timestamp}]*\n${message}`;
-            
-            await this.telegram.sendMessage(
-                this.telegramChatId, 
-                fullMessage, 
-                { 
-                    parse_mode: 'Markdown',
-                    disable_notification: silent 
-                }
-            );
-            
-        } catch (error) {
-            console.warn('⚠️ Errore invio notifica Telegram:', error.message);
-        }
-    }
-
-    // Common status methods for telegram
     async sendBotStatus(chatId) {
         const uptime = this.getUptime();
         const status = this.isRunning ? '🟢 Attivo' : '🔴 Fermo';
@@ -1708,6 +2091,81 @@ Ora trova MOLTI più token validi!
         `.trim();
         
         await this.telegram.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+    }
+
+    // =============================================================================
+    // UTILITY METHODS
+    // =============================================================================
+
+    sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+    
+    stop() {
+        this.isRunning = false;
+        console.log('🛑 Bot v2.4.3 FINALE fermato');
+        this.notify('🛑 Bot v2.4.3 FINALE fermato', 'info');
+    }
+
+    getUptime() {
+        if (!this.startTime) return '0s';
+        const uptime = Date.now() - this.startTime;
+        const hours = Math.floor(uptime / (1000 * 60 * 60));
+        const minutes = Math.floor((uptime % (1000 * 60 * 60)) / (1000 * 60));
+        return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+    }
+
+    getWinRate() {
+        if (this.stats.totalTrades === 0) return 0;
+        return Math.round((this.stats.winningTrades / this.stats.totalTrades) * 100);
+    }
+
+    formatTime(ms) {
+        const seconds = Math.floor(ms / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const hours = Math.floor(minutes / 60);
+        
+        if (hours > 0) return `${hours}h ${minutes % 60}m`;
+        if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
+        return `${seconds}s`;
+    }
+
+    async notify(message, type = 'info', silent = false) {
+        console.log(`📱 ${message}`);
+        
+        if (!this.telegram || !this.telegramChatId) return;
+        
+        try {
+            let emoji = '';
+            switch (type) {
+                case 'trade': emoji = '💰'; break;
+                case 'profit': emoji = '📈'; break;
+                case 'loss': emoji = '📉'; break;
+                case 'warning': emoji = '⚠️'; break;
+                case 'error': emoji = '❌'; break;
+                case 'success': emoji = '✅'; break;
+                case 'startup': emoji = '🎯'; break;
+                case 'scam': emoji = '🛡️'; break;
+                case 'debug': emoji = '🔬'; break;
+                case 'finale': emoji = '🎯'; break;
+                default: emoji = 'ℹ️';
+            }
+            
+            const timestamp = new Date().toLocaleTimeString('it-IT');
+            const fullMessage = `${emoji} *[${timestamp}]*\n${message}`;
+            
+            await this.telegram.sendMessage(
+                this.telegramChatId, 
+                fullMessage, 
+                { 
+                    parse_mode: 'Markdown',
+                    disable_notification: silent 
+                }
+            );
+            
+        } catch (error) {
+            console.warn('⚠️ Errore invio notifica Telegram:', error.message);
+        }
     }
 }
 
@@ -1864,461 +2322,4 @@ console.log('• Keywords estese & filtri intelligenti ✅');
 console.log('• Evita duplicati & soglie adattive ✅');
 console.log('============================================');
 console.log('🎉 RISULTATO: Il bot ora trova MOLTI più token validi!');
-console.log('🎯 Usa /emergency per vedere le patch in azione!'); Cerca nelle stats o nei reserves
-            if (pool.stats && pool.stats.volume && Array.isArray(pool.stats.volume)) {
-                const volume = pool.stats.volume.reduce((sum, vol) => sum + parseFloat(vol || 0), 0);
-                if (volume > 0) return volume * 10; // Stima liquidità da volume
-            }
-            
-            // Fallback: usa reserves se disponibili
-            if (pool.reserves && Array.isArray(pool.reserves)) {
-                const reserves = pool.reserves.reduce((sum, res) => sum + parseFloat(res || 0), 0);
-                if (reserves > 0) return reserves / 1000000; // Converte da nano
-            }
-            
-            // Default: assegna valore minimo per pool attivi
-            return pool.totalSupply && parseFloat(pool.totalSupply) > 0 ? 5 : 0;
-            
-        } catch (error) {
-            return 0;
-        }
-    }
-
-    // PATCH v2.4.3: NUOVO METODO CALCOLO VOLUME
-    calculatePoolVolume(pool) {
-        try {
-            if (pool.stats && pool.stats.volume && Array.isArray(pool.stats.volume)) {
-                return pool.stats.volume.reduce((sum, vol) => sum + parseFloat(vol || 0), 0);
-            }
-            return 0;
-        } catch (error) {
-            return 0;
-        }
-    }
-
-    // PATCH v2.4.3: FILTRI INTELLIGENTI CON RESET BLACKLIST
-    passesFiltersDebug(token) {
-        const filters = this.config.finaleOptimized;
-        
-        console.log(`\n🎯 FILTRI v2.4.3 FINALE per ${token.name} (${token.symbol}):`);
-        this.filterResults.totalScanned++;
-        
-        // NUOVO: Reset blacklist ogni 10 scansioni per dare seconde possibilità
-        if (this.scanCount % 10 === 0 && this.tokenBlacklist.size > 50) {
-            const oldSize = this.tokenBlacklist.size;
-            this.tokenBlacklist.clear();
-            console.log(`   🔄 RESET BLACKLIST: ${oldSize} token rimossi per dare seconde possibilità`);
-        }
-        
-        // 1. BLACKLIST (ora più permissiva)
-        if (this.tokenBlacklist.has(token.address)) {
-            console.log(`   ❌ FALLITO: Token in blacklist`);
-            this.filterResults.failedScam++;
-            return false;
-        }
-        console.log(`   ✅ PASSATO: Non in blacklist`);
-        
-        // 2. SCAM CHECK (ora più permissivo)
-        if (this.isObviousScamTokenImproved(token)) {
-            console.log(`   ❌ FALLITO: Scam ovvio rilevato`);
-            this.tokenBlacklist.add(token.address);
-            this.filterResults.failedScam++;
-            return false;
-        }
-        console.log(`   ✅ PASSATO: Non è scam ovvio`);
-        
-        // 3. LIQUIDITÀ (soglia più bassa)
-        const minLiquidity = Math.min(filters.minLiquidity, 1); // Minimo $1
-        if (token.liquidity < minLiquidity) {
-            console.log(`   ❌ FALLITO: Liquidità ${token.liquidity} < ${minLiquidity}`);
-            this.filterResults.failedLiquidity++;
-            return false;
-        }
-        console.log(`   ✅ PASSATO: Liquidità ${token.liquidity} >= ${minLiquidity}`);
-        
-        // 4. ETÀ (più permissivo)
-        const tokenAge = Date.now() - (token.createdAt || Date.now() - 3600000);
-        const minAge = Math.min(filters.minTokenAge, 60000); // Minimo 1 minuto
-        const maxAge = Math.max(filters.maxTokenAge, 86400000 * 365); // Massimo 1 anno
-        
-        const ageMinutes = tokenAge / (1000 * 60);
-        const ageHours = tokenAge / (1000 * 60 * 60);
-        const ageDays = tokenAge / (1000 * 60 * 60 * 24);
-        
-        console.log(`   🕐 Token age: ${ageMinutes.toFixed(1)} min (${ageHours.toFixed(1)} ore, ${ageDays.toFixed(1)} giorni)`);
-        
-        if (tokenAge < minAge) {
-            console.log(`   ❌ FALLITO: Troppo nuovo ${ageMinutes.toFixed(1)} min < ${(minAge / (1000 * 60)).toFixed(1)} min`);
-            this.filterResults.failedAge++;
-            return false;
-        }
-        
-        if (tokenAge > maxAge) {
-            console.log(`   ❌ FALLITO: Troppo vecchio ${ageDays.toFixed(1)} giorni > ${(maxAge / (1000 * 60 * 60 * 24)).toFixed(1)} giorni`);
-            this.filterResults.failedAge++;
-            return false;
-        }
-        console.log(`   ✅ PASSATO: Età valida`);
-        
-        // 5. KEYWORDS (più permissivo)
-        const tokenText = `${token.name} ${token.symbol}`.toLowerCase();
-        console.log(`   🔤 Testo da analizzare: "${tokenText}"`);
-        
-        // NUOVO: Keywords più ampie
-        const extendedKeywords = [
-            ...filters.strongKeywords,
-            'new', 'hot', 'launch', 'trade', 'swap', 'bridge', 'yield', 'pool', 'farm',
-            'ai', 'btc', 'eth', 'sol', 'ton', 'usdt', 'usdc', 'dao', 'nft', 'game',
-            'meme', 'dog', 'cat', 'inu', 'elon', 'trump', 'biden', 'x', 'twitter'
-        ];
-        
-        const matchedKeywords = [];
-        for (const keyword of extendedKeywords) {
-            if (tokenText.includes(keyword.toLowerCase())) {
-                matchedKeywords.push(keyword);
-            }
-        }
-        
-        console.log(`   🎯 Keywords trovate: [${matchedKeywords.join(', ')}]`);
-        
-        if (matchedKeywords.length === 0) {
-            console.log(`   ❌ FALLITO: Nessuna keyword trovata`);
-            this.filterResults.failedKeywords++;
-            return false;
-        }
-        
-        console.log(`   ✅ PASSATO: ${matchedKeywords.length} keywords trovate!`);
-        
-        this.filterResults.passedBasic++;
-        console.log(`   🎉 TOKEN APPROVATO v2.4.3: ${token.symbol} supera tutti i filtri!`);
-        return true;
-    }
-
-    // PATCH v2.4.3: ANTI-SCAM MIGLIORATO
-    isObviousScamTokenImproved(token) {
-        const name = token.name.toLowerCase();
-        const symbol = token.symbol.toLowerCase();
-        const combined = `${name} ${symbol}`;
-        
-        // SOLO i più ovvi e pericolosi
-        const obviousScamPatterns = [
-            /^test$/i, /^fake$/i, /^scam$/i, /^rug$/i,
-            /^[a-f0-9]{40,}$/i,  // Solo hash lunghi
-            /^[0-9]{10,}$/,     // Solo numeri lunghi
-            /(.)\1{8,}/,        // Troppi caratteri ripetuti (8+ invece di 6+)
-            /^.{1,2}$/,         // Solo 1-2 caratteri
-            /^.{150,}$/,        // Troppo lungo (150+ invece di 100+)
-            /fuck|shit|xxx|sex|porn|scam|rug|fake|test123/i,
-            /^(bitcoin|btc|ethereum|eth|usdt|usdc|bnb|ada|sol)$/i // Solo imitazioni perfette
-        ];
-        
-        for (const pattern of obviousScamPatterns) {
-            if (pattern.test(combined)) {
-                console.log(`   🚨 Scam OVVIO: ${pattern} in "${combined}"`);
-                return true;
-            }
-        }
-        
-        // NUOVO: Non bloccare per liquidità 0 (è normale per pool nuovi)
-        if (token.liquidity < 0) { // Solo liquidità negativa (impossibile)
-            console.log(`   🚨 Liquidità impossibile: ${token.liquidity}`);
-            return true;
-        }
-        
-        return false;
-    }
-
-    // =============================================================================
-    // WALLET INITIALIZATION (identico ma con logs v2.4.3)
-    // =============================================================================
-
-    async debugWalletAddresses(mnemonic) {
-        console.log('🔍 DEBUG: Analisi wallet addresses v2.4.3...');
-        
-        try {
-            const yourWallet = 'UQBdflvdcISFuWFWvdXlonQObvfBUFOBpML3Loxsjp5tVbw0';
-            console.log('📍 Target wallet: ', yourWallet);
-            
-            const keyPair = await mnemonicToPrivateKey(mnemonic);
-            const wallet = WalletContractV4.create({ 
-                publicKey: keyPair.publicKey, 
-                workchain: 0 
-            });
-            
-            const address = wallet.address;
-            const generated = address.toString({ bounceable: false });
-            const isMatch = yourWallet === generated;
-            
-            console.log('\n🎯 VERIFICA v2.4.3:');
-            console.log('Target:      ', yourWallet);
-            console.log('Generato:    ', generated);
-            console.log('Match?       ', isMatch ? '✅ SÌ' : '❌ NO');
-            
-            return { isMatch, generated, target: yourWallet };
-            
-        } catch (error) {
-            console.error('❌ Errore debug wallet:', error.message);
-            return { isMatch: false, error: error.message };
-        }
-    }
-
-    async initialize() {
-        try {
-            console.log('🔑 Inizializzazione wallet v2.4.3 FINALE...');
-            
-            const mnemonicString = process.env.MNEMONIC_WORDS;
-            
-            if (!mnemonicString) {
-                throw new Error('MNEMONIC_WORDS non configurato nelle variabili ambiente');
-            }
-            
-            const mnemonic = mnemonicString.split(',').map(word => word.trim());
-            
-            if (mnemonic.length !== 24) {
-                throw new Error(`Mnemonic deve avere 24 parole, ricevute: ${mnemonic.length}`);
-            }
-            
-            console.log('✅ Mnemonic parsate: 24 parole');
-            
-            const debugResult = await this.debugWalletAddresses(mnemonic);
-            
-            if (!debugResult.isMatch) {
-                console.warn('⚠️ WARNING: Wallet generato non corrisponde al target');
-                await this.notify(`⚠️ WALLET MISMATCH!\nTarget: ${debugResult.target}\nGenerato: ${debugResult.generated}\nVerifica MNEMONIC_WORDS!`, 'warning');
-            }
-            
-            const keyPair = await mnemonicToPrivateKey(mnemonic);
-            this.wallet = WalletContractV4.create({ 
-                publicKey: keyPair.publicKey, 
-                workchain: 0 
-            });
-            
-            this.walletAddress = this.wallet.address.toString({ bounceable: false });
-            
-            const contract = this.client.open(this.wallet);
-            const balance = await contract.getBalance();
-            this.stats.startBalance = Number(balance) / 1000000000;
-            
-            console.log('🏦 TON Wallet inizializzato correttamente');
-            console.log(`📍 Address: ${this.walletAddress}`);
-            console.log(`💰 Balance: ${this.stats.startBalance.toFixed(4)} TON`);
-            
-            await this.notify(`
-🏦 *Wallet Inizializzato v2.4.3 FINALE*
-Address: \`${this.walletAddress}\`
-Balance: ${this.stats.startBalance.toFixed(4)} TON
-Status: ${this.stats.startBalance >= this.config.finaleOptimized.minStartBalance ? '✅ Pronto' : '⚠️ Balance basso'}
-Match: ${debugResult.isMatch ? '✅ Corretto' : '❌ Verifica mnemonic'}
-Webhook: ${this.webhookConfigured ? '✅ Attivo' : '📱 Fallback'}
-🎯 Patch v2.4.3: ✅ APPLICATE
-            `, 'success');
-            
-            return true;
-        } catch (error) {
-            console.error('❌ Errore inizializzazione:', error.message);
-            await this.notify(`❌ Errore inizializzazione wallet: ${error.message}`, 'error');
-            return false;
-        }
-    }
-
-    async start() {
-        console.log('🎯 Bot v2.4.3 FINALE avviato...');
-        
-        if (!await this.initialize()) {
-            console.error('❌ Impossibile inizializzare il bot');
-            return;
-        }
-        
-        this.isRunning = true;
-        this.startTime = Date.now();
-        
-        await this.notify(`
-🎯 *Bot v2.4.3 FINALE Avviato*
-
-💳 Wallet: \`${this.walletAddress}\`
-🔗 Webhook: ${this.webhookConfigured ? '✅ Funzionante' : '📱 Polling fallback'}
-
-📊 *Configurazione v2.4.3:*
-• Confidence: ${this.config.finaleOptimized.minConfidenceScore}%
-• Liquidità: ${this.config.finaleOptimized.minLiquidity}
-• Scansione: ${this.config.finaleOptimized.scanInterval / 1000}s
-• Age range: ${(this.config.finaleOptimized.minTokenAge/1000/60).toFixed(0)}min-${(this.config.finaleOptimized.maxTokenAge/1000/60/60/24).toFixed(0)}gg
-
-🎯 *PATCH v2.4.3 Features:*
-• Mapping fixed & liquidità reale ✅
-• Filtri intelligenti & blacklist reset ✅
-• Keywords estese & soglie adattive ✅
-• Anti-scam migliorato ✅
-
-🔧 Usa /emergency per test completo!
-💡 Usa /patch per info migliorie
-        `, 'startup');
-        
-        // Avvia monitoraggio con PATCH v2.4.3
-        this.mainMonitoring();
-        this.dailyStatsReset();
-        this.emergencyChecks();
-        this.scheduleReports();
-    }
-
-    // =============================================================================
-    // TRADING ENGINE v2.4.3 FINALE
-    // =============================================================================
-
-    async canContinueTrading() {
-        const config = this.config.finaleOptimized;
-        
-        const currentBalance = await this.getWalletBalance();
-        if (currentBalance < config.minStartBalance) {
-            console.log(`❌ Balance insufficiente: ${currentBalance.toFixed(4)} TON < ${config.minStartBalance} TON`);
-            
-            if (this.scanCount % 20 === 0) {
-                await this.notify(`💰 Balance insufficiente per trading\nBalance attuale: ${currentBalance.toFixed(4)} TON\nMinimo richiesto: ${config.minStartBalance} TON`, 'warning', true);
-            }
-            return false;
-        }
-        
-        if (this.stats.dailyPnL <= -config.maxDailyLoss) {
-            console.log(`❌ Perdita giornaliera eccessiva: ${this.stats.dailyPnL.toFixed(4)} TON <= -${config.maxDailyLoss} TON`);
-            return false;
-        }
-        
-        if (this.positions.size >= config.maxPositions) {
-            console.log(`❌ Troppe posizioni aperte: ${this.positions.size} >= ${config.maxPositions}`);
-            return false;
-        }
-        
-        console.log(`✅ Trading consentito - Balance: ${currentBalance.toFixed(4)} TON`);
-        return true;
-    }
-
-    async mainMonitoring() {
-        const scanInterval = this.config.finaleOptimized.scanInterval || 30000;
-        
-        while (this.isRunning) {
-            try {
-                const canTrade = await this.canContinueTrading();
-                
-                if (!canTrade) {
-                    console.log('⏸️ Trading sospeso per limiti di sicurezza');
-                    await this.sleep(scanInterval * 2);
-                    continue;
-                }
-                
-                this.scanCount++;
-                console.log(`\n🎯 FINALE Scan #${this.scanCount} - ${new Date().toLocaleTimeString()} (v2.4.3)`);
-                
-                const qualityTokens = await this.findQualityTokens();
-                this.candidatesFound += qualityTokens.length;
-                
-                if (qualityTokens.length > 0) {
-                    console.log(`   🎯 Trovati ${qualityTokens.length} token candidati (v2.4.3 FINALE)`);
-                    
-                    // Notifica ogni 5 scansioni con risultati
-                    if (this.scanCount % 5 === 0) {
-                        await this.notify(`
-🎯 *FINALE Scan #${this.scanCount}*
-🎯 Candidati: ${qualityTokens.length}
-📊 Total trovati: ${this.candidatesFound}
-📈 Success rate: ${((this.candidatesFound / this.scanCount) * 100).toFixed(1)}%
-✅ Patch v2.4.3: ATTIVE
-                        `, 'debug', true);
-                    }
-                    
-                    for (const token of qualityTokens) {
-                        const stillCanTrade = await this.canContinueTrading();
-                        if (!stillCanTrade) break;
-                        
-                        const analysis = await this.tokenAnalysis(token);
-                        if (analysis.shouldBuy) {
-                            await this.executeBuy(token, analysis);
-                        } else {
-                            console.log(`   📋 ${token.symbol}: ${analysis.rejectionReason}`);
-                        }
-                        
-                        await this.sleep(3000);
-                    }
-                } else {
-                    console.log('   💤 Nessun token candidato trovato');
-                    
-                    // Debug ogni 10 scansioni senza risultati
-                    if (this.scanCount % 10 === 0) {
-                        await this.notify(`
-🎯 *FINALE Debug: Scan #${this.scanCount} - 0 candidati*
-📊 Success rate totale: ${((this.candidatesFound / this.scanCount) * 100).toFixed(1)}%
-
-🔧 Patch v2.4.3 Status:
-• Mapping: ✅ Fixed
-• Filtri: ✅ Intelligenti  
-• Blacklist: ✅ Reset attivo
-• Keywords: ✅ Estese
-
-💡 Usa /emergency per diagnosi completa
-                        `, 'debug', true);
-                    }
-                }
-                
-                await this.updateStats();
-                await this.sleep(scanInterval);
-                
-            } catch (error) {
-                console.error('❌ Errore nel monitoraggio v2.4.3:', error.message);
-                await this.notify(`❌ Errore trading v2.4.3: ${error.message}`, 'error');
-                await this.sleep(scanInterval * 2);
-            }
-        }
-    }
-
-    async findQualityTokens() {
-        const qualityTokens = [];
-        
-        try {
-            for (const dex of this.trustedDEXs) {
-                console.log(`🎯 Scansione ${dex} v2.4.3...`);
-                const tokens = await this.scanDEX(dex);
-                qualityTokens.push(...tokens);
-                this.tokensAnalyzed += tokens.length;
-                console.log(`   📊 ${dex}: ${tokens.length} token candidati trovati (v2.4.3)`);
-            }
-            
-            const filtered = qualityTokens.filter(token => this.passesFiltersDebug(token));
-            
-            return filtered;
-            
-        } catch (error) {
-            console.log('⚠️ Errore ricerca token v2.4.3:', error.message);
-            return [];
-        }
-    }
-
-    async scanDEX(dex) {
-        try {
-            switch (dex) {
-                case 'DeDust':
-                    return await this.scanDeDustFixed();
-                case 'STON.fi':
-                    return await this.scanSTONfiFixed();
-                default:
-                    return [];
-            }
-        } catch (error) {
-            console.log(`⚠️ Errore scansione ${dex} v2.4.3:`, error.message);
-            return [];
-        }
-    }
-
-    async tokenAnalysis(token) {
-        console.log(`🎯 Analisi v2.4.3: ${token.name} (${token.symbol})`);
-        
-        let confidenceScore = 50; // Base per v2.4.3
-        const analysis = {
-            shouldBuy: false,
-            confidenceScore: 0,
-            reasons: [],
-            warnings: [],
-            rejectionReason: '',
-            patchVersion: '2.4.3'
-        };
-        
-        try {
-            //
+console.log('🎯 Usa /emergency per vedere le patch in azione!');
