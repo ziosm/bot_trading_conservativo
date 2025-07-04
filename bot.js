@@ -327,23 +327,25 @@ class RealTradingBot {
             return tonPools.map(pool => {
                 try {
                     let tokenInfo = null;
-                    let tonReserve = 0;
-                    let tokenReserve = 0;
+                    let tonIndex = -1;
+                    let tokenIndex = -1;
                     
-                    // Trova asset TON e token
-                    pool.assets.forEach(asset => {
+                    // Trova quale asset è TON e quale è il token
+                    pool.assets.forEach((asset, index) => {
                         if (asset.type === 'native' || asset.symbol === 'TON') {
-                            // Questo è TON
-                            tonReserve = parseFloat(asset.reserve || 0) / 1e9; // Converti da nanoton
+                            tonIndex = index;
                         } else if (asset.type === 'jetton' || asset.address) {
-                            // Questo è il token
                             tokenInfo = asset;
-                            const decimals = asset.metadata?.decimals || 9;
-                            tokenReserve = parseFloat(asset.reserve || 0) / Math.pow(10, decimals);
+                            tokenIndex = index;
                         }
                     });
                     
-                    if (!tokenInfo) return null;
+                    if (!tokenInfo || tonIndex === -1 || tokenIndex === -1) return null;
+                    
+                    // Le reserve sono nell'array pool.reserves nello stesso ordine degli assets
+                    const tonReserve = parseFloat(pool.reserves[tonIndex] || 0) / 1e9; // Converti da nanoton
+                    const decimals = tokenInfo.metadata?.decimals || 9;
+                    const tokenReserve = parseFloat(pool.reserves[tokenIndex] || 0) / Math.pow(10, decimals);
                     
                     // Calcola liquidità in USD (assumendo 1 TON = ~$5)
                     const tonPriceUSD = 5; // Prezzo approssimativo
@@ -351,10 +353,8 @@ class RealTradingBot {
                     
                     // Calcola volume dalle stats se disponibili
                     let volume24h = 0;
-                    if (pool.stats) {
-                        volume24h = parseFloat(pool.stats.volume_24h || pool.stats.volume || 0);
-                    } else if (pool.volume) {
-                        volume24h = parseFloat(pool.volume.h24 || pool.volume['24h'] || pool.volume || 0);
+                    if (pool.stats?.volume_24h) {
+                        volume24h = parseFloat(pool.stats.volume_24h);
                     }
                     
                     // Calcola prezzo del token in TON
