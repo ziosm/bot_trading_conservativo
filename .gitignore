@@ -1,7 +1,19 @@
+# Dependencies
 node_modules/
+
+# Environment variables  
 .env
 wallet-config.js
+
+# Logs
 logs/
 *.log
-.DS_Store
 npm-debug.log*
+
+# Local scripts (not needed on Render)
+scripts/
+pm2.config.js
+
+# OS files
+.DS_Store
+Thumbs.db
