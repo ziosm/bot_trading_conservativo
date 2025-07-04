@@ -447,7 +447,7 @@ Motivo: ${reason}
                         symbol: targetToken,
                         liquidity: parseFloat(attrs.reserve_in_usd || attrs.fdv_usd || 0),
                         volume24h: parseFloat(attrs.volume_usd?.h24 || 0),
-                        dex: 'GeckoTerminal',
+                        dex: 'STON.fi', // Default a STON.fi per ora
                         poolAddress: attrs.address || pool.id,
                         currentPrice: parseFloat(attrs.price_usd || attrs.base_token_price_usd || 0),
                         tokenAddress: attrs.address || pool.id,
